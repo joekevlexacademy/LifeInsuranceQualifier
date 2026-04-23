@@ -171,10 +171,18 @@
     let result;
     try {
       const res = await fetch(`/api/setup/run?location_id=${locationId}`);
-      result = await res.json();
+      const text = await res.text();
+      try {
+        result = JSON.parse(text);
+      } catch (_) {
+        throw new Error(`Server error (HTTP ${res.status}): ${text.slice(0, 300)}`);
+      }
+      if (!res.ok && !result.steps) {
+        throw new Error(result.detail || `HTTP ${res.status}`);
+      }
     } catch (e) {
       document.getElementById('setupError').style.display = 'block';
-      document.getElementById('setupError').textContent = 'Network error. Please refresh and try again.';
+      document.getElementById('setupError').textContent = e.message;
       return;
     }
 

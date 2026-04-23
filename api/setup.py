@@ -45,8 +45,14 @@ async def run(location_id: str, access_token: str) -> dict:
     config: dict = {"location_id": location_id}
 
     # Check which fields already exist so re-running setup is safe
-    existing = await ghl.list_custom_fields(access_token, location_id)
-    existing_by_name = {f["name"]: f for f in existing}
+    try:
+        existing = await ghl.list_custom_fields(access_token, location_id)
+        existing_by_name = {f["name"]: f for f in existing}
+    except Exception as exc:
+        return {
+            "steps": [{"label": f"GHL API error: {exc}", "ok": False}],
+            "success": False,
+        }
 
     for field_def in FIELDS:
         label = field_def["name"]
