@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Life Insurance Qualifier — Setup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      background: linear-gradient(135deg, #0a1020 0%, #0f1a35 100%);
+      color: #eef2ff;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .card {
+      background: rgba(19, 26, 46, 0.92);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 44px 48px;
+      width: 100%; max-width: 480px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+    }
+    .logo {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 28px;
+    }
+    .logo-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: linear-gradient(135deg, #7aa2ff, #8ef0d0);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .logo-text { font-size: 1.1rem; font-weight: 700; }
+    .logo-sub  { font-size: 0.82rem; color: #9fb0d9; margin-top: 2px; }
+    h2 { margin: 0 0 8px; font-size: 1.55rem; letter-spacing: -0.02em; }
+    .sub { color: #9fb0d9; margin: 0 0 28px; line-height: 1.6; font-size: 0.96rem; }
+    .checklist { list-style: none; margin: 0 0 32px; padding: 0; display: grid; gap: 12px; }
+    .checklist li {
+      display: flex; align-items: center; gap: 12px;
+      font-size: 0.95rem; color: #c8d6ff;
+    }
+    .check-icon {
+      width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+      background: rgba(122,162,255,0.15); border: 1px solid rgba(122,162,255,0.35);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+    }
+    .check-icon.ok  { background: rgba(158,240,175,0.15); border-color: rgba(158,240,175,0.4); color: #9ef0af; }
+    .check-icon.err { background: rgba(255,155,155,0.15); border-color: rgba(255,155,155,0.4); color: #ff9b9b; }
+    .check-icon.spin { animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .note {
+      background: rgba(122,162,255,0.07);
+      border: 1px solid rgba(122,162,255,0.18);
+      border-radius: 12px; padding: 14px 16px;
+      color: #9fb0d9; font-size: 0.88rem; line-height: 1.55;
+      margin-bottom: 28px;
+    }
+    .note strong { color: #c8d6ff; }
+    .btn {
+      width: 100%; padding: 15px; border: 0; border-radius: 13px;
+      font: inherit; font-weight: 700; font-size: 1rem; cursor: pointer;
+      transition: opacity 0.15s, transform 0.12s;
+    }
+    .btn:hover:not(:disabled) { transform: translateY(-1px); opacity: 0.92; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: linear-gradient(135deg, #7aa2ff, #8ef0d0); color: #05101a; }
+    .btn-ghost   { background: rgba(255,255,255,0.06); color: #eef2ff; border: 1px solid rgba(255,255,255,0.1); margin-top: 10px; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    .success-icon {
+      width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 24px;
+      background: rgba(158,240,175,0.12); border: 2px solid rgba(158,240,175,0.35);
+      display: flex; align-items: center; justify-content: center; font-size: 30px;
+    }
+    .center { text-align: center; }
+    .error-msg {
+      color: #ff9b9b; font-size: 0.88rem; margin-top: 12px;
+      background: rgba(255,155,155,0.08); border: 1px solid rgba(255,155,155,0.25);
+      border-radius: 10px; padding: 12px 14px; display: none;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">🛡</div>
+    <div>
+      <div class="logo-text">Life Insurance Qualifier</div>
+      <div class="logo-sub">GoHighLevel App</div>
+    </div>
+  </div>
+
+  <!-- Screen 1: Welcome -->
+  <div class="screen active" id="s1">
+    <h2>Set up in 60 seconds</h2>
+    <p class="sub">One click connects your GoHighLevel sub-account and configures everything automatically.</p>
+    <ul class="checklist">
+      <li><span class="check-icon">✓</span> Connects to your GHL sub-account via OAuth</li>
+      <li><span class="check-icon">✓</span> Creates all 5 qualification contact fields</li>
+      <li><span class="check-icon">✓</span> Activates the qualifier on contact records</li>
+      <li><span class="check-icon">✓</span> No manual steps required</li>
+    </ul>
+    <div class="note"><strong>You'll need:</strong> GoHighLevel admin access to the sub-account you're installing into.</div>
+    <button class="btn btn-primary" onclick="startOAuth()">Connect GoHighLevel →</button>
+  </div>
+
+  <!-- Screen 2: Auto-setup running -->
+  <div class="screen" id="s2">
+    <h2>Setting up…</h2>
+    <p class="sub" id="locationLabel">Configuring your sub-account.</p>
+    <ul class="checklist" id="setupSteps">
+      <li id="step-connect"><span class="check-icon ok">✓</span> GHL account connected</li>
+      <li id="step-f1"><span class="check-icon spin" id="ic-f1">↻</span> Creating LIQ Triage State field</li>
+      <li id="step-f2"><span class="check-icon" id="ic-f2">·</span> Creating LIQ Product Direction field</li>
+      <li id="step-f3"><span class="check-icon" id="ic-f3">·</span> Creating LIQ Active Dependencies field</li>
+      <li id="step-f4"><span class="check-icon" id="ic-f4">·</span> Creating LIQ Coverage Amount field</li>
+      <li id="step-f5"><span class="check-icon" id="ic-f5">·</span> Creating LIQ Product Type field</li>
+      <li id="step-save"><span class="check-icon" id="ic-save">·</span> Saving configuration</li>
+    </ul>
+    <div class="error-msg" id="setupError"></div>
+  </div>
+
+  <!-- Screen 3: Done -->
+  <div class="screen" id="s3">
+    <div class="center">
+      <div class="success-icon">✓</div>
+      <h2>You're all set!</h2>
+      <p class="sub">Life Insurance Qualifier is ready. Open any contact in GHL and click <strong>Start Qualification</strong> to begin.</p>
+      <button class="btn btn-primary" id="openAppBtn">Open App →</button>
+      <button class="btn btn-ghost" onclick="window.close()">Close this tab</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const step = params.get('step');
+  const locationId = params.get('location_id');
+
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function startOAuth() {
+    window.location.href = '/oauth/start';
+  }
+
+  function markIcon(id, state) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'check-icon' + (state === 'ok' ? ' ok' : state === 'err' ? ' err' : state === 'spin' ? ' spin' : '');
+    el.textContent = state === 'ok' ? '✓' : state === 'err' ? '✕' : state === 'spin' ? '↻' : '·';
+  }
+
+  async function runSetup() {
+    show('s2');
+    const icons = ['ic-f1','ic-f2','ic-f3','ic-f4','ic-f5','ic-save'];
+
+    // Fetch location name
+    try {
+      const locRes = await fetch(`/api/location?location_id=${locationId}`);
+      const locData = await locRes.json();
+      document.getElementById('locationLabel').textContent = `Configuring ${locData.name || 'your sub-account'}…`;
+    } catch (_) {}
+
+    // Run setup and animate steps
+    markIcon('ic-f1', 'spin');
+    let result;
+    try {
+      const res = await fetch(`/api/setup/run?location_id=${locationId}`);
+      result = await res.json();
+    } catch (e) {
+      document.getElementById('setupError').style.display = 'block';
+      document.getElementById('setupError').textContent = 'Network error. Please refresh and try again.';
+      return;
+    }
+
+    // Animate each icon in sequence
+    const fieldIcons = ['ic-f1','ic-f2','ic-f3','ic-f4','ic-f5'];
+    const fieldSteps = result.steps.slice(0, 5);
+    for (let i = 0; i < fieldSteps.length; i++) {
+      if (i > 0) markIcon(fieldIcons[i], 'spin');
+      await new Promise(r => setTimeout(r, 350));
+      markIcon(fieldIcons[i], fieldSteps[i].ok ? 'ok' : 'err');
+    }
+
+    // Save step
+    markIcon('ic-save', 'spin');
+    await new Promise(r => setTimeout(r, 300));
+    markIcon('ic-save', result.success ? 'ok' : 'err');
+
+    if (result.success) {
+      await new Promise(r => setTimeout(r, 600));
+      document.getElementById('openAppBtn').href = `/?location_id=${locationId}`;
+      document.getElementById('openAppBtn').onclick = () => { window.location.href = `/?location_id=${locationId}`; };
+      show('s3');
+    } else {
+      const errEl = document.getElementById('setupError');
+      errEl.style.display = 'block';
+      const failed = result.steps.filter(s => !s.ok).map(s => s.label).join('; ');
+      errEl.textContent = `Setup failed: ${failed}. Check that your GHL API key has customFields.write permission, then retry.`;
+    }
+  }
+
+  // Auto-advance to setup screen if returning from OAuth
+  if (step === 'setup' && locationId) {
+    runSetup();
+  }
+</script>
+</body>
+</html>

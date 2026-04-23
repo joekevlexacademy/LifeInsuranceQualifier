@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Life Insurance Qualifier</title>
+  <style>
+    :root {
+      --bg: #0b1020; --panel: #131a2e; --panel-2: #19223d;
+      --border: #2b365d; --text: #eef2ff; --muted: #9fb0d9;
+      --accent: #7aa2ff; --accent-2: #8ef0d0;
+      --danger: #ff9b9b; --warn: #ffd48a; --ok: #9ef0af;
+      --shadow: 0 20px 50px rgba(0,0,0,0.35); --radius: 18px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at top left, rgba(122,162,255,0.16), transparent 32%),
+                  radial-gradient(circle at top right, rgba(142,240,208,0.09), transparent 28%),
+                  linear-gradient(180deg, #0a1020 0%, #0f1530 100%);
+      color: var(--text); min-height: 100%;
+    }
+    .shell { max-width: 1320px; margin: 0 auto; padding: 28px 20px 48px; }
+    .top-bar {
+      display: flex; align-items: center; gap: 14px; margin-bottom: 24px;
+    }
+    .back-btn {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px; padding: 9px 14px; color: var(--muted);
+      font: inherit; font-size: 0.88rem; cursor: pointer; text-decoration: none;
+      transition: color 0.15s;
+    }
+    .back-btn:hover { color: var(--text); }
+    .top-bar h1 { margin: 0; font-size: 1.2rem; letter-spacing: -0.02em; flex: 1; }
+    .contact-bar {
+      background: rgba(19,26,46,0.88); border: 1px solid rgba(255,255,255,0.07);
+      border-radius: var(--radius); padding: 20px 24px; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    }
+    .contact-avatar {
+      width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg,#7aa2ff,#8ef0d0);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 1rem; color: #05101a;
+    }
+    .contact-info { flex: 1; }
+    .contact-info strong { display: block; font-size: 1rem; }
+    .contact-info span   { color: var(--muted); font-size: 0.88rem; }
+    .new-contact-badge {
+      background: rgba(122,162,255,0.12); border: 1px solid rgba(122,162,255,0.3);
+      color: #c8d6ff; border-radius: 999px; padding: 5px 12px; font-size: 0.8rem; font-weight: 700;
+    }
+    .layout { display: grid; grid-template-columns: minmax(0,1.5fr) 370px; gap: 22px; align-items: start; }
+    .form-card, .sticky-card, .section, .alert, .pill-row {
+      background: rgba(19,26,46,0.88); border: 1px solid rgba(255,255,255,0.07);
+      backdrop-filter: blur(14px); box-shadow: var(--shadow); border-radius: var(--radius);
+    }
+    .form-card  { padding: 24px; }
+    .sticky-card{ padding: 20px; position: sticky; top: 18px; }
+    .section { padding: 20px; margin-bottom: 16px; border: 1px solid var(--border); }
+    .section-header { display: flex; justify-content: space-between; align-items: start; gap: 16px; margin-bottom: 18px; }
+    .section-title-wrap p { margin: 0; color: var(--muted); line-height: 1.5; }
+    h2, h3 { margin: 0 0 12px; letter-spacing: -0.02em; }
+    .muted { color: var(--muted); }
+    .badge {
+      white-space: nowrap; padding: 8px 11px; border-radius: 999px;
+      background: rgba(142,240,208,0.12); border: 1px solid rgba(142,240,208,0.35);
+      color: #c9fff0; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .grid { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); gap: 14px; }
+    .field { grid-column: span 12; display: flex; flex-direction: column; gap: 7px; }
+    .field.half { grid-column: span 6; }
+    .field.third { grid-column: span 4; }
+    .field.two-third { grid-column: span 8; }
+    label { font-size: 0.93rem; font-weight: 600; color: #edf2ff; }
+    input, select, textarea {
+      width: 100%; border: 1px solid #33406c; background: rgba(7,11,24,0.8);
+      color: var(--text); border-radius: 12px; padding: 12px 13px;
+      font: inherit; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent); box-shadow: 0 0 0 4px rgba(122,162,255,0.16);
+    }
+    textarea { min-height: 104px; resize: vertical; }
+    .options, .check-grid { display: grid; gap: 10px; }
+    .options.inline { grid-template-columns: repeat(auto-fit,minmax(135px,1fr)); }
+    .check-grid { grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); }
+    .option, .check {
+      border: 1px solid #33406c; background: rgba(7,11,24,0.68);
+      border-radius: 12px; padding: 12px 14px;
+      display: flex; align-items: center; gap: 10px; min-height: 50px;
+      cursor: pointer; user-select: none;
+    }
+    .option input, .check input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; flex: 0 0 auto; }
+    .alert { padding: 16px; margin-bottom: 14px; border: 1px solid transparent; }
+    .alert.warn    { background: rgba(255,212,138,0.09); border-color: rgba(255,212,138,0.28); color: #ffe5b4; }
+    .alert.danger  { background: rgba(255,155,155,0.09); border-color: rgba(255,155,155,0.28); color: #ffd0d0; }
+    .alert.ok      { background: rgba(158,240,175,0.08); border-color: rgba(158,240,175,0.26); color: #d8ffdf; }
+    .alert h4 { margin: 0 0 6px; font-size: 0.98rem; }
+    .alert p, .sticky-card p { margin: 0; line-height: 1.55; }
+    .pill-row { padding: 12px; display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 7px; border-radius: 999px;
+      padding: 8px 12px; font-size: 0.82rem; border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04); color: var(--text);
+    }
+    .pill.on { background: rgba(122,162,255,0.18); border-color: rgba(122,162,255,0.5); color: #dbe5ff; }
+    .summary-list { display: grid; gap: 10px; margin-top: 14px; }
+    .summary-item { border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; background: rgba(255,255,255,0.03); }
+    .summary-item strong { display: block; margin-bottom: 5px; font-size: 0.92rem; }
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+    button { border: 0; border-radius: 12px; padding: 12px 14px; font: inherit; font-weight: 700; cursor: pointer; transition: transform 0.12s, opacity 0.2s; }
+    button:hover:not(:disabled) { transform: translateY(-1px); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .primary { background: linear-gradient(135deg,#7aa2ff,#8ef0d0); color: #05101a; }
+    .secondary { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid rgba(255,255,255,0.08); }
+    .hidden { display: none !important; }
+    /* Success screen */
+    .success-screen {
+      display: none; text-align: center; padding: 60px 32px;
+      background: rgba(19,26,46,0.88); border: 1px solid rgba(255,255,255,0.07);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+    }
+    .success-screen.active { display: block; }
+    .success-icon-lg {
+      width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 24px;
+      background: rgba(158,240,175,0.12); border: 2px solid rgba(158,240,175,0.35);
+      display: flex; align-items: center; justify-content: center; font-size: 34px;
+    }
+    .success-screen h2 { font-size: 1.7rem; margin-bottom: 10px; }
+    .success-screen p  { color: var(--muted); line-height: 1.6; max-width: 42ch; margin: 0 auto 28px; }
+    .btn-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    @media (max-width:1080px) { .layout { grid-template-columns: 1fr; } .sticky-card { position: static; } }
+    @media (max-width:760px) {
+      .field.half, .field.third, .field.two-third { grid-column: span 12; }
+      .shell { padding: 16px 14px 40px; }
+    }
+  </style>
+</head>
+<body>
+<div class="shell" id="mainShell">
+  <div class="top-bar">
+    <a class="back-btn" id="backBtn" href="#">← Back</a>
+    <h1>Life Insurance Qualifier</h1>
+  </div>
+
+  <!-- Contact bar (hidden until loaded) -->
+  <div class="contact-bar hidden" id="contactBar">
+    <div class="contact-avatar" id="contactAvatar">?</div>
+    <div class="contact-info">
+      <strong id="contactName">Loading…</strong>
+      <span id="contactMeta"></span>
+    </div>
+    <span class="new-contact-badge hidden" id="newBadge">New Contact</span>
+  </div>
+
+  <div class="layout">
+    <main class="form-card">
+      <h2>Prequalification intake</h2>
+      <p class="muted" style="margin-top:0;margin-bottom:18px;line-height:1.6;">
+        Fill in what you know. Conditional sections appear automatically based on your answers.
+      </p>
+
+      <form id="lifeForm">
+        <!-- New contact section (shown only when no contact_id) -->
+        <section class="section hidden" id="newContactSection">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3>Contact details</h3>
+              <p>This contact will be created in GHL on submit.</p>
+            </div>
+            <span class="badge">New contact</span>
+          </div>
+          <div class="grid">
+            <div class="field half"><label for="nc_firstName">First name</label><input id="nc_firstName" name="nc_firstName" placeholder="Jordan" /></div>
+            <div class="field half"><label for="nc_lastName">Last name</label><input id="nc_lastName" name="nc_lastName" placeholder="Applicant" /></div>
+            <div class="field half"><label for="nc_email">Email</label><input id="nc_email" name="nc_email" type="email" placeholder="jordan@example.com" /></div>
+            <div class="field half"><label for="nc_phone">Phone</label><input id="nc_phone" name="nc_phone" placeholder="+1 555 000 0000" /></div>
+          </div>
+        </section>
+
+        <!-- Section 1: Applicant basics -->
+        <section class="section">
+          <div class="section-header">
+            <div class="section-title-wrap"><h3>1. Applicant basics</h3><p>Core identifying details and high-level fit.</p></div>
+            <span class="badge">Always shown</span>
+          </div>
+          <div class="grid">
+            <div class="field half"><label for="state">State of residence</label><input id="state" name="state" placeholder="Texas" /></div>
+            <div class="field third"><label for="age">Age</label><input id="age" name="age" type="number" min="0" max="100" placeholder="44" /></div>
+            <div class="field third"><label for="sexAtBirth">Sex at birth</label><select id="sexAtBirth" name="sexAtBirth"><option value="">Select…</option><option>Male</option><option>Female</option></select></div>
+            <div class="field third"><label for="occupation">Occupation</label><input id="occupation" name="occupation" placeholder="Operations manager" /></div>
+            <div class="field half"><label for="height">Height</label><input id="height" name="height" placeholder="5'11&quot;" /></div>
+            <div class="field half"><label for="weight">Weight</label><input id="weight" name="weight" placeholder="220 lbs" /></div>
+          </div>
+        </section>
+
+        <!-- Section 2: Coverage goals -->
+        <section class="section">
+          <div class="section-header">
+            <div class="section-title-wrap"><h3>2. Coverage goals</h3><p>Qualifies product direction and urgency.</p></div>
+            <span class="badge">Always shown</span>
+          </div>
+          <div class="grid">
+            <div class="field half"><label for="productType">Coverage type</label><select id="productType" name="productType"><option value="">Select…</option><option>Term life</option><option>Whole life</option><option>Universal life</option><option>Final expense</option><option>Mortgage protection</option><option>Not sure yet</option></select></div>
+            <div class="field half"><label for="coverageAmount">Desired death benefit</label><input id="coverageAmount" name="coverageAmount" placeholder="$500,000" /></div>
+            <div class="field half"><label for="budget">Monthly budget range</label><input id="budget" name="budget" placeholder="$80 – $150" /></div>
+            <div class="field half"><label for="urgency">How soon is coverage needed?</label><select id="urgency" name="urgency"><option value="">Select…</option><option>Immediately</option><option>Within 30 days</option><option>Within 60 days</option><option>Just exploring</option></select></div>
+            <div class="field"><label for="goal">Primary reason for coverage</label><textarea id="goal" name="goal" placeholder="Income replacement, mortgage protection, family security…"></textarea></div>
+          </div>
+        </section>
+
+        <!-- Section 3: Underwriting triage -->
+        <section class="section">
+          <div class="section-header">
+            <div class="section-title-wrap"><h3>3. Fast underwriting triage</h3><p>High-impact screens that determine whether deeper follow-up is needed.</p></div>
+            <span class="badge">Decision gateway</span>
+          </div>
+          <div class="grid">
+            <div class="field half"><label for="pendingTests">Any pending tests, biopsy, or unresolved symptoms?</label><select id="pendingTests" name="pendingTests"><option value="">Select…</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+            <div class="field half"><label for="hospitalRecent">Hospitalization, ER visit, or surgery in last 24 months?</label><select id="hospitalRecent" name="hospitalRecent"><option value="">Select…</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+            <div class="field half"><label for="underwritingHistory">Previously declined, postponed, or rated?</label><select id="underwritingHistory" name="underwritingHistory"><option value="">Select…</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+            <div class="field half"><label for="duiHistory">DUI or serious driving issue in last 5 years?</label><select id="duiHistory" name="duiHistory"><option value="">Select…</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+            <div class="field"><label>Which of these currently apply?</label>
+              <div class="check-grid">
+                <label class="check"><input type="checkbox" id="sleepApnea" /> Sleep apnea diagnosis</label>
+                <label class="check"><input type="checkbox" id="cpap" /> Uses CPAP / BiPAP / APAP</label>
+                <label class="check"><input type="checkbox" id="diabetesMeds" /> Diabetes medication / insulin</label>
+                <label class="check"><input type="checkbox" id="psychMeds" /> Psychiatric medication</label>
+                <label class="check"><input type="checkbox" id="inhaler" /> Inhaler / respiratory medication</label>
+                <label class="check"><input type="checkbox" id="cardiacHistory" /> Heart / chest pain history</label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 4: Medications -->
+        <section class="section">
+          <div class="section-header">
+            <div class="section-title-wrap"><h3>4. Medications and treatment</h3><p>Medication data often uncovers underlying conditions.</p></div>
+            <span class="badge">Always shown</span>
+          </div>
+          <div class="grid">
+            <div class="field two-third"><label for="medList">Current medications or equipment</label><textarea id="medList" name="medList" placeholder="Metformin 500mg twice daily; CPAP nightly; Sertraline 50mg daily…"></textarea></div>
+            <div class="field third"><label for="medChange">Any recent medication change?</label><select id="medChange" name="medChange"><option value="">Select…</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+          </div>
+        </section>
+
+        <!-- Dependency: Pending work-up -->
+        <section class="section hidden" id="pendingBlock">
+          <div class="section-header"><div class="section-title-wrap"><h3>Pending work-up follow-up</h3><p>Open because there is unresolved testing or an open medical work-up.</p></div><span class="badge">Dependency</span></div>
+          <div class="grid">
+            <div class="field half"><label for="pendingReason">What is being investigated?</label><input id="pendingReason" placeholder="Abnormal mammogram, cardiac work-up…" /></div>
+            <div class="field half"><label for="pendingDate">When did this begin?</label><input id="pendingDate" placeholder="MM/YYYY" /></div>
+            <div class="field half"><label for="pendingDoctor">Specialist involved</label><input id="pendingDoctor" placeholder="Cardiologist, oncologist…" /></div>
+            <div class="field half"><label for="pendingFollowup">Next scheduled follow-up</label><input id="pendingFollowup" placeholder="MM/DD/YYYY" /></div>
+            <div class="field"><label for="pendingNotes">Any known preliminary findings?</label><textarea id="pendingNotes" placeholder="Symptoms, abnormal imaging, biopsy recommendation…"></textarea></div>
+          </div>
+        </section>
+
+        <!-- Dependency: Sleep apnea -->
+        <section class="section hidden" id="sleepApneaBlock">
+          <div class="section-header"><div class="section-title-wrap"><h3>Sleep apnea / CPAP follow-up</h3><p>Needs severity, compliance, and comorbidity review.</p></div><span class="badge">Triggered by CPAP / apnea</span></div>
+          <div class="grid">
+            <div class="field third"><label for="apneaType">Type</label><select id="apneaType"><option value="">Select…</option><option>Obstructive</option><option>Central</option><option>Mixed</option><option>Unknown</option></select></div>
+            <div class="field third"><label for="apneaSeverity">Severity</label><select id="apneaSeverity"><option value="">Select…</option><option>Mild</option><option>Moderate</option><option>Severe</option><option>Unknown</option></select></div>
+            <div class="field third"><label for="ahi">AHI score</label><input id="ahi" placeholder="e.g. 31" /></div>
+            <div class="field third"><label for="cpapUse">Using PAP therapy?</label><select id="cpapUse"><option value="">Select…</option><option>Yes</option><option>No</option></select></div>
+            <div class="field third"><label for="nightsPerWeek">Nights / week used</label><input id="nightsPerWeek" placeholder="7" /></div>
+            <div class="field third"><label for="hoursPerNight">Hours / night</label><input id="hoursPerNight" placeholder="6.5" /></div>
+            <div class="field half"><label for="daytimeFatigue">Ongoing daytime fatigue?</label><select id="daytimeFatigue"><option value="">Select…</option><option>No</option><option>Yes</option></select></div>
+            <div class="field half"><label for="oxygenNight">Night oxygen use?</label><select id="oxygenNight"><option value="">Select…</option><option>No</option><option>Yes</option></select></div>
+            <div class="field"><label>Associated conditions</label>
+              <div class="check-grid">
+                <label class="check"><input type="checkbox" /> Hypertension</label>
+                <label class="check"><input type="checkbox" /> Diabetes</label>
+                <label class="check"><input type="checkbox" /> Atrial fibrillation</label>
+                <label class="check"><input type="checkbox" /> Pulmonary hypertension</label>
+                <label class="check"><input type="checkbox" /> Obesity concern</label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Dependency: Diabetes -->
+        <section class="section hidden" id="diabetesBlock">
+          <div class="section-header"><div class="section-title-wrap"><h3>Diabetes follow-up</h3><p>Need A1C, treatment type, complications, and control status.</p></div><span class="badge">Triggered by meds</span></div>
+          <div class="grid">
+            <div class="field third"><label for="diabetesType">Type</label><select id="diabetesType"><option value="">Select…</option><option>Type 1</option><option>Type 2</option><option>Prediabetes</option></select></div>
+            <div class="field third"><label for="diagnosisAge">Age diagnosed</label><input id="diagnosisAge" type="number" placeholder="39" /></div>
+            <div class="field third"><label for="a1c">Most recent A1C</label><input id="a1c" placeholder="6.9" /></div>
+            <div class="field half"><label for="insulinUse">Insulin currently used?</label><select id="insulinUse"><option value="">Select…</option><option>No</option><option>Yes</option></select></div>
+            <div class="field half"><label for="diabetesControl">Control status</label><select id="diabetesControl"><option value="">Select…</option><option>Stable / controlled</option><option>Some fluctuation</option><option>Poor control</option></select></div>
+            <div class="field"><label>Complications</label>
+              <div class="check-grid">
+                <label class="check"><input type="checkbox" /> Neuropathy</label>
+                <label class="check"><input type="checkbox" /> Retinopathy</label>
+                <label class="check"><input type="checkbox" /> Kidney involvement</label>
+                <label class="check"><input type="checkbox" /> Foot ulcer history</label>
+                <label class="check"><input type="checkbox" /> No complications known</label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Dependency: Mental health -->
+        <section class="section hidden" id="mentalHealthBlock">
+          <div class="section-header"><div class="section-title-wrap"><h3>Mental health follow-up</h3><p>Need diagnosis, stability, and hospitalization history.</p></div><span class="badge">Triggered by psych meds</span></div>
+          <div class="grid">
+            <div class="field half"><label for="mhDiagnosis">Primary diagnosis</label><select id="mhDiagnosis"><option value="">Select…</option><option>Anxiety</option><option>Depression</option><option>PTSD</option><option>Bipolar disorder</option><option>ADHD</option><option>Other</option></select></div>
+            <div class="field half"><label for="mhStability">Current stability</label><select id="mhStability"><option value="">Select…</option><option>Stable on treatment</option><option>Some recent adjustment</option><option>Unstable / worsening</option></select></div>
+            <div class="field half"><label for="therapy">Active therapy or psychiatry follow-up?</label><select id="therapy"><option value="">Select…</option><option>None currently</option><option>Therapy only</option><option>Psychiatry only</option><option>Both</option></select></div>
+            <div class="field half"><label for="mhHospital">Mental health hospitalization or suicide history?</label><select id="mhHospital"><option value="">Select…</option><option>No</option><option>Yes</option></select></div>
+            <div class="field"><label for="mhNotes">Context / work leave / medication notes</label><textarea id="mhNotes" placeholder="Any leave from work, hospitalization dates, medication changes…"></textarea></div>
+          </div>
+        </section>
+
+        <!-- Dependency: Respiratory -->
+        <section class="section hidden" id="respiratoryBlock">
+          <div class="section-header"><div class="section-title-wrap"><h3>Respiratory follow-up</h3><p>Need inhaler frequency, steroid history, and smoking context.</p></div><span class="badge">Triggered by inhaler</span></div>
+          <div class="grid">
+            <div class="field third"><label for="respDiagnosis">Diagnosis</label><select id="respDiagnosis"><option value="">Select…</option><option>Asthma</option><option>COPD</option><option>Chronic bronchitis</option><option>Other</option></select></div>
+            <div class="field third"><label for="rescueUse">Rescue inhaler usage</label><select id="rescueUse"><option value="">Select…</option><option>Rare</option><option>Weekly</option><option>Daily</option><option>Multiple times daily</option></select></div>
+            <div class="field third"><label for="oralSteroids">Oral steroids in last 12 months?</label><select id="oralSteroids"><option value="">Select…</option><option>No</option><option>Yes</option></select></div>
+            <div class="field half"><label for="smokerStatus">Smoking status</label><select id="smokerStatus"><option value="">Select…</option><option>Never</option><option>Former</option><option>Current</option></select></div>
+            <div class="field half"><label for="respHospital">ER / hospitalization for breathing in past 2 years?</label><select id="respHospital"><option value="">Select…</option><option>No</option><option>Yes</option></select></div>
+          </div>
+        </section>
+
+        <!-- Dependency: DUI -->
+        <section class="section hidden" id="duiBlock">
+          <div class="section-header"><div class="section-title-wrap"><h3>Driving / DUI follow-up</h3><p>Need incident count, dates, and current license status.</p></div><span class="badge">Triggered by driving history</span></div>
+          <div class="grid">
+            <div class="field third"><label for="duiCount">Number of incidents</label><input id="duiCount" type="number" min="1" placeholder="1" /></div>
+            <div class="field third"><label for="duiDate">Most recent date</label><input id="duiDate" placeholder="MM/YYYY" /></div>
+            <div class="field third"><label for="licenseStatus">Current license status</label><select id="licenseStatus"><option value="">Select…</option><option>Valid</option><option>Restricted</option><option>Suspended</option><option>Reinstated after suspension</option></select></div>
+            <div class="field half"><label for="substanceProgram">Treatment / court program completed?</label><select id="substanceProgram"><option value="">Select…</option><option>No</option><option>Yes</option></select></div>
+            <div class="field half"><label for="bac">BAC known?</label><input id="bac" placeholder="Optional" /></div>
+          </div>
+        </section>
+
+        <!-- Section 5: Existing coverage -->
+        <section class="section">
+          <div class="section-header"><div class="section-title-wrap"><h3>5. Existing coverage and prior underwriting</h3><p>Helps route replacement cases and impaired-risk scenarios.</p></div><span class="badge">Always shown</span></div>
+          <div class="grid">
+            <div class="field half"><label for="existingCoverage">Existing life coverage</label><select id="existingCoverage"><option value="">Select…</option><option>No current coverage</option><option>Some coverage in force</option><option>Actively replacing coverage</option></select></div>
+            <div class="field half"><label for="priorOutcome">Most recent underwriting outcome</label><select id="priorOutcome"><option value="">Select…</option><option>No recent application</option><option>Approved as applied</option><option>Rated</option><option>Postponed</option><option>Declined</option></select></div>
+            <div class="field"><label for="underwritingNotes">Relevant underwriting notes</label><textarea id="underwritingNotes" placeholder="Rating reason, postpone context, known carrier friction…"></textarea></div>
+          </div>
+        </section>
+      </form>
+
+      <div class="toolbar">
+        <button type="button" class="primary" id="submitBtn" onclick="submitForm()">Save qualification →</button>
+        <button type="button" class="secondary" onclick="resetForm()">Reset form</button>
+      </div>
+      <div id="submitError" style="color:#ff9b9b;font-size:0.88rem;margin-top:12px;display:none;"></div>
+    </main>
+
+    <aside class="sticky-card">
+      <h3>Live advisor summary</h3>
+      <p class="muted">Updates as you fill the form.</p>
+      <div id="triageSignal" class="alert ok" style="margin-top:16px;">
+        <h4>Initial read: relatively clean</h4>
+        <p>No major dependency active yet.</p>
+      </div>
+      <div>
+        <h3 style="font-size:1rem;margin-top:18px;">Active dependencies</h3>
+        <div class="pill-row" id="activePills"><span class="pill">None active</span></div>
+      </div>
+      <div class="summary-list" id="summaryList">
+        <div class="summary-item"><strong>Product direction</strong>Waiting for coverage goals.</div>
+        <div class="summary-item"><strong>Likely follow-up</strong>Pending sections appear once triggered.</div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- Success screen (hidden until submit) -->
+<div class="shell hidden" id="successShell">
+  <div class="success-screen active">
+    <div class="success-icon-lg">✓</div>
+    <h2>Qualification saved</h2>
+    <p id="successMsg">The qualification has been recorded and the contact has been updated in GoHighLevel.</p>
+    <div class="btn-row">
+      <a id="ghlContactBtn" href="#" target="_blank">
+        <button class="primary" type="button">Open contact in GHL →</button>
+      </a>
+      <button class="secondary" type="button" onclick="qualifyAnother()">Qualify another</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const urlParams = new URLSearchParams(location.search);
+  const locationId = urlParams.get('location_id') || '';
+  const contactId  = urlParams.get('contact_id') || '';
+  const isNew = !contactId;
+
+  // Back button
+  document.getElementById('backBtn').href = `/?location_id=${locationId}`;
+
+  // Show new contact section if needed
+  if (isNew) {
+    document.getElementById('newContactSection').classList.remove('hidden');
+    document.getElementById('newBadge').classList.remove('hidden');
+    document.getElementById('contactBar').classList.remove('hidden');
+    document.getElementById('contactAvatar').textContent = '+';
+    document.getElementById('contactName').textContent = 'New contact';
+    document.getElementById('contactMeta').textContent = 'Will be created in GHL on submit';
+  } else {
+    // Pre-fill from GHL
+    document.getElementById('contactBar').classList.remove('hidden');
+    fetch(`/api/contact?location_id=${locationId}&contact_id=${contactId}`)
+      .then(r => r.json())
+      .then(c => {
+        const name = [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Contact';
+        document.getElementById('contactName').textContent = name;
+        document.getElementById('contactAvatar').textContent = name.charAt(0).toUpperCase();
+        document.getElementById('contactMeta').textContent = [c.email, c.phone].filter(Boolean).join(' · ') || 'No contact details on file';
+      })
+      .catch(() => {
+        document.getElementById('contactName').textContent = 'Contact';
+        document.getElementById('contactMeta').textContent = '';
+      });
+  }
+
+  // ── Dependency logic (same as demo) ─────────────────────────────────────────
+
+  const refs = {
+    pendingTests: document.getElementById('pendingTests'),
+    hospitalRecent: document.getElementById('hospitalRecent'),
+    underwritingHistory: document.getElementById('underwritingHistory'),
+    duiHistory: document.getElementById('duiHistory'),
+    sleepApnea: document.getElementById('sleepApnea'),
+    cpap: document.getElementById('cpap'),
+    diabetesMeds: document.getElementById('diabetesMeds'),
+    psychMeds: document.getElementById('psychMeds'),
+    inhaler: document.getElementById('inhaler'),
+    cardiacHistory: document.getElementById('cardiacHistory'),
+    productType: document.getElementById('productType'),
+    coverageAmount: document.getElementById('coverageAmount'),
+  };
+
+  const blockMap = [
+    { key:'pending', label:'Pending work-up',        el: document.getElementById('pendingBlock'),      active: () => refs.pendingTests.value === 'yes' },
+    { key:'sleep',   label:'Sleep apnea / CPAP',     el: document.getElementById('sleepApneaBlock'),   active: () => refs.sleepApnea.checked || refs.cpap.checked },
+    { key:'diabetes',label:'Diabetes follow-up',     el: document.getElementById('diabetesBlock'),     active: () => refs.diabetesMeds.checked },
+    { key:'mental',  label:'Mental health follow-up',el: document.getElementById('mentalHealthBlock'), active: () => refs.psychMeds.checked },
+    { key:'resp',    label:'Respiratory follow-up',  el: document.getElementById('respiratoryBlock'),  active: () => refs.inhaler.checked },
+    { key:'dui',     label:'Driving / DUI follow-up',el: document.getElementById('duiBlock'),          active: () => refs.duiHistory.value === 'yes' },
+  ];
+
+  function renderState() {
+    const active = blockMap.filter(b => { const on = b.active(); b.el.classList.toggle('hidden', !on); return on; });
+    renderPills(active); renderTriage(active); renderSummary(active);
+  }
+
+  function renderPills(active) {
+    document.getElementById('activePills').innerHTML = active.length
+      ? active.map(b => `<span class="pill on">${b.label}</span>`).join('')
+      : '<span class="pill">None active</span>';
+  }
+
+  function triageState(active) {
+    const severeCount = active.length
+      + (refs.hospitalRecent.value === 'yes' ? 1 : 0)
+      + (refs.underwritingHistory.value === 'yes' ? 1 : 0)
+      + (refs.cardiacHistory.checked ? 1 : 0);
+    if (refs.pendingTests.value === 'yes' || severeCount >= 4) return 'elevated';
+    if (active.length > 0) return 'follow_up';
+    return 'clean';
+  }
+
+  function renderTriage(active) {
+    const state = triageState(active);
+    const map = {
+      clean:     { cls:'ok',     title:'Initial read: relatively clean',          desc:'No major dependency active yet.' },
+      follow_up: { cls:'warn',   title:'Initial read: follow-up required',        desc:'Condition-specific blocks are open.' },
+      elevated:  { cls:'danger', title:'Initial read: elevated underwriting attention', desc:'Multiple triggers — pre-screen before quoting.' },
+    };
+    const t = map[state];
+    const el = document.getElementById('triageSignal');
+    el.className = `alert ${t.cls}`;
+    el.innerHTML = `<h4>${t.title}</h4><p>${t.desc}</p>`;
+  }
+
+  function productDirection(active) {
+    if (refs.pendingTests.value === 'yes') return 'Likely needs cautious pre-screen before product recommendation.';
+    if (active.length >= 3) return 'Likely carrier-shopping or manual review candidate rather than quick quote only.';
+    const p = refs.productType.value.toLowerCase();
+    if (p.includes('final')) return 'Likely final-expense positioning if health and budget support it.';
+    if (p.includes('term'))  return 'Likely traditional term path if follow-up blocks remain manageable.';
+    return 'Needs light qualification before narrowing product fit.';
+  }
+
+  function renderSummary(active) {
+    const coverage = refs.coverageAmount.value.trim() || 'not entered yet';
+    const product  = refs.productType.value || 'not selected';
+    const dir = productDirection(active);
+    const fu = active.length ? active.map(b => `<li>${b.label}</li>`).join('') : '<li>No conditional follow-ups active.</li>';
+    const notes = [];
+    notes.push(`Desired coverage: <strong>${coverage}</strong>.`);
+    notes.push(`Product direction: <strong>${product}</strong>.`);
+    if (refs.underwritingHistory.value === 'yes') notes.push('Prior underwriting friction noted — review before quoting.');
+    if (refs.hospitalRecent.value === 'yes') notes.push('Recent hospitalization — clarify dates and recovery status.');
+    if (refs.cardiacHistory.checked) notes.push('Cardiac history marked — cardiology questions recommended.');
+    document.getElementById('summaryList').innerHTML = `
+      <div class="summary-item"><strong>Product direction</strong>${dir}</div>
+      <div class="summary-item"><strong>Likely follow-up</strong><ul style="margin:8px 0 0 18px;padding:0;color:var(--muted);line-height:1.55;">${fu}</ul></div>
+      <div class="summary-item"><strong>Advisor notes</strong><ul style="margin:8px 0 0 18px;padding:0;color:var(--muted);line-height:1.55;">${notes.map(n=>`<li>${n}</li>`).join('')}</ul></div>`;
+  }
+
+  document.querySelectorAll('input,select,textarea').forEach(el => {
+    el.addEventListener('input', renderState);
+    el.addEventListener('change', renderState);
+  });
+
+  function resetForm() {
+    document.getElementById('lifeForm').reset();
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    renderState();
+  }
+
+  // ── Submit ───────────────────────────────────────────────────────────────────
+
+  async function submitForm() {
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    document.getElementById('submitError').style.display = 'none';
+
+    const active = blockMap.filter(b => b.active());
+    const state  = triageState(active);
+    const deps   = active.map(b => b.label).join(', ') || null;
+    const dir    = productDirection(active);
+
+    const firstName = document.getElementById('nc_firstName')?.value.trim() || '';
+    const lastName  = document.getElementById('nc_lastName')?.value.trim() || '';
+
+    const payload = {
+      location_id: locationId,
+      contact_id: contactId || null,
+      full_name: isNew ? `${firstName} ${lastName}`.trim() : null,
+      email: document.getElementById('nc_email')?.value.trim() || null,
+      phone: document.getElementById('nc_phone')?.value.trim() || null,
+      state: document.getElementById('state').value.trim() || null,
+      age: parseInt(document.getElementById('age').value) || null,
+      sex_at_birth: document.getElementById('sexAtBirth').value || null,
+      occupation: document.getElementById('occupation').value.trim() || null,
+      height: document.getElementById('height').value.trim() || null,
+      weight: document.getElementById('weight').value.trim() || null,
+      product_type: refs.productType.value || null,
+      coverage_amount: refs.coverageAmount.value.trim() || null,
+      budget: document.getElementById('budget').value.trim() || null,
+      urgency: document.getElementById('urgency').value || null,
+      goal: document.getElementById('goal').value.trim() || null,
+      pending_tests: refs.pendingTests.value || null,
+      hospital_recent: refs.hospitalRecent.value || null,
+      underwriting_history: refs.underwritingHistory.value || null,
+      dui_history: refs.duiHistory.value || null,
+      sleep_apnea: refs.sleepApnea.checked,
+      cpap: refs.cpap.checked,
+      diabetes_meds: refs.diabetesMeds.checked,
+      psych_meds: refs.psychMeds.checked,
+      inhaler: refs.inhaler.checked,
+      cardiac_history: refs.cardiacHistory.checked,
+      med_list: document.getElementById('medList').value.trim() || null,
+      med_change: document.getElementById('medChange').value || null,
+      existing_coverage: document.getElementById('existingCoverage').value || null,
+      prior_outcome: document.getElementById('priorOutcome').value || null,
+      underwriting_notes: document.getElementById('underwritingNotes').value.trim() || null,
+      triage_state: state,
+      active_dependencies: deps,
+      product_direction: dir,
+    };
+
+    try {
+      const res = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Server error ${res.status}`);
+      }
+      const data = await res.json();
+      const savedContactId = data.contact_id;
+      const name = isNew ? `${firstName} ${lastName}`.trim() : document.getElementById('contactName').textContent;
+
+      document.getElementById('successMsg').textContent =
+        `${name || 'Contact'} has been qualified and their record updated in GoHighLevel.`;
+      document.getElementById('ghlContactBtn').href =
+        `https://app.gohighlevel.com/v2/location/${locationId}/contacts/detail/${savedContactId}`;
+
+      document.getElementById('mainShell').classList.add('hidden');
+      document.getElementById('successShell').classList.remove('hidden');
+    } catch (e) {
+      const errEl = document.getElementById('submitError');
+      errEl.textContent = `Failed to save: ${e.message}`;
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Save qualification →';
+    }
+  }
+
+  function qualifyAnother() {
+    window.location.href = `/?location_id=${locationId}`;
+  }
+
+  renderState();
+</script>
+</body>
+</html>

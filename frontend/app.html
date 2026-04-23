@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Life Insurance Qualifier</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      background: linear-gradient(160deg, #0a1020 0%, #0f1a35 100%);
+      color: #eef2ff;
+    }
+    .shell { max-width: 720px; margin: 0 auto; padding: 32px 20px 48px; }
+    .header { display: flex; align-items: center; gap: 14px; margin-bottom: 32px; }
+    .logo-icon {
+      width: 42px; height: 42px; border-radius: 11px;
+      background: linear-gradient(135deg, #7aa2ff, #8ef0d0);
+      display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;
+    }
+    .header-text h1 { margin: 0; font-size: 1.3rem; letter-spacing: -0.02em; }
+    .header-text p  { margin: 0; color: #9fb0d9; font-size: 0.88rem; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 32px; }
+    .action-btn {
+      background: rgba(19,26,46,0.88);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px; padding: 22px 20px;
+      cursor: pointer; text-align: left; color: #eef2ff;
+      transition: border-color 0.2s, transform 0.12s;
+      text-decoration: none; display: block;
+    }
+    .action-btn:hover { border-color: rgba(122,162,255,0.45); transform: translateY(-2px); }
+    .action-btn .icon { font-size: 26px; margin-bottom: 10px; }
+    .action-btn strong { display: block; font-size: 1rem; margin-bottom: 4px; }
+    .action-btn span { color: #9fb0d9; font-size: 0.86rem; line-height: 1.5; }
+    .section-title {
+      font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: #7aa2ff; margin-bottom: 14px;
+    }
+    .recent-list { display: grid; gap: 10px; }
+    .recent-item {
+      background: rgba(19,26,46,0.72);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 13px; padding: 16px 18px;
+      display: flex; align-items: center; gap: 14px;
+      cursor: pointer; text-decoration: none; color: inherit;
+      transition: border-color 0.2s;
+    }
+    .recent-item:hover { border-color: rgba(122,162,255,0.3); }
+    .triage-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+    .triage-dot.clean    { background: #9ef0af; }
+    .triage-dot.follow_up{ background: #ffd48a; }
+    .triage-dot.elevated { background: #ff9b9b; }
+    .triage-dot.unknown  { background: #9fb0d9; }
+    .recent-info { flex: 1; min-width: 0; }
+    .recent-info strong { display: block; font-size: 0.95rem; }
+    .recent-info span   { color: #9fb0d9; font-size: 0.84rem; }
+    .triage-badge {
+      font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+      text-transform: capitalize; white-space: nowrap;
+    }
+    .triage-badge.clean     { background: rgba(158,240,175,0.12); color: #9ef0af; }
+    .triage-badge.follow_up { background: rgba(255,212,138,0.12); color: #ffd48a; }
+    .triage-badge.elevated  { background: rgba(255,155,155,0.12); color: #ff9b9b; }
+    .triage-badge.unknown   { background: rgba(159,176,217,0.12); color: #9fb0d9; }
+    .empty {
+      text-align: center; padding: 32px 0; color: #9fb0d9; font-size: 0.94rem;
+    }
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(5,10,24,0.75); backdrop-filter: blur(4px);
+      z-index: 100; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #131a2e; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 18px; padding: 28px; width: 100%; max-width: 460px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    }
+    .modal h3 { margin: 0 0 16px; font-size: 1.1rem; }
+    .search-input {
+      width: 100%; border: 1px solid #33406c; background: rgba(7,11,24,0.8);
+      color: #eef2ff; border-radius: 11px; padding: 12px 14px;
+      font: inherit; outline: none; margin-bottom: 14px;
+      transition: border-color 0.2s;
+    }
+    .search-input:focus { border-color: #7aa2ff; }
+    .search-results { display: grid; gap: 8px; max-height: 280px; overflow-y: auto; }
+    .search-result {
+      padding: 13px 14px; border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 11px; cursor: pointer; transition: border-color 0.15s;
+    }
+    .search-result:hover { border-color: rgba(122,162,255,0.4); }
+    .search-result strong { display: block; font-size: 0.94rem; }
+    .search-result span   { color: #9fb0d9; font-size: 0.82rem; }
+    .search-empty { color: #9fb0d9; font-size: 0.9rem; text-align: center; padding: 20px 0; }
+    .modal-close {
+      float: right; background: none; border: none; color: #9fb0d9;
+      font-size: 1.3rem; cursor: pointer; margin-top: -4px;
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <div class="header">
+    <div class="logo-icon">🛡</div>
+    <div class="header-text">
+      <h1>Life Insurance Qualifier</h1>
+      <p id="locationName">Loading…</p>
+    </div>
+  </div>
+
+  <div class="actions">
+    <a class="action-btn" id="newContactBtn" href="#">
+      <div class="icon">➕</div>
+      <strong>Qualify new contact</strong>
+      <span>Create and qualify a new prospect in one step</span>
+    </a>
+    <div class="action-btn" onclick="openSearch()">
+      <div class="icon">🔍</div>
+      <strong>Find existing contact</strong>
+      <span>Search and qualify someone already in GHL</span>
+    </div>
+  </div>
+
+  <div class="section-title">Recent qualifications</div>
+  <div class="recent-list" id="recentList">
+    <div class="empty">Loading…</div>
+  </div>
+</div>
+
+<!-- Contact search modal -->
+<div class="modal-overlay" id="searchModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeSearch()">✕</button>
+    <h3>Find a contact</h3>
+    <input
+      class="search-input" id="searchInput"
+      placeholder="Type a name or phone number…"
+      oninput="onSearch()"
+      autocomplete="off"
+    />
+    <div class="search-results" id="searchResults">
+      <div class="search-empty">Start typing to search</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const locationId = params.get('location_id') || '';
+
+  // Set entry point URLs
+  document.getElementById('newContactBtn').href = `/qualify?location_id=${locationId}`;
+
+  // Load location name
+  fetch(`/api/location?location_id=${locationId}`)
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('locationName').textContent = d.name || 'Your sub-account';
+    })
+    .catch(() => {
+      document.getElementById('locationName').textContent = 'Your sub-account';
+    });
+
+  // Load recent qualifications
+  fetch(`/api/qualifications/recent?location_id=${locationId}`)
+    .then(r => r.json())
+    .then(({ qualifications }) => {
+      const list = document.getElementById('recentList');
+      if (!qualifications.length) {
+        list.innerHTML = '<div class="empty">No qualifications yet. Start with a contact above.</div>';
+        return;
+      }
+      list.innerHTML = qualifications.map(q => {
+        const state = q.triage_state || 'unknown';
+        const label = state.replace('_', ' ');
+        const date = new Date(q.qualified_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return `
+          <a class="recent-item" href="/qualify?location_id=${locationId}&contact_id=${q.contact_id}">
+            <div class="triage-dot ${state}"></div>
+            <div class="recent-info">
+              <strong>${q.contact_name || 'Unknown'}</strong>
+              <span>Last qualified ${date}</span>
+            </div>
+            <span class="triage-badge ${state}">${label}</span>
+          </a>`;
+      }).join('');
+    })
+    .catch(() => {
+      document.getElementById('recentList').innerHTML = '<div class="empty">Could not load recent qualifications.</div>';
+    });
+
+  // Search modal
+  function openSearch() {
+    document.getElementById('searchModal').classList.add('open');
+    setTimeout(() => document.getElementById('searchInput').focus(), 50);
+  }
+  function closeSearch() {
+    document.getElementById('searchModal').classList.remove('open');
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchResults').innerHTML = '<div class="search-empty">Start typing to search</div>';
+  }
+
+  let searchTimer;
+  function onSearch() {
+    clearTimeout(searchTimer);
+    const q = document.getElementById('searchInput').value.trim();
+    if (q.length < 2) {
+      document.getElementById('searchResults').innerHTML = '<div class="search-empty">Start typing to search</div>';
+      return;
+    }
+    document.getElementById('searchResults').innerHTML = '<div class="search-empty">Searching…</div>';
+    searchTimer = setTimeout(() => doSearch(q), 300);
+  }
+
+  async function doSearch(q) {
+    try {
+      const res = await fetch(`/api/contacts/search?location_id=${locationId}&q=${encodeURIComponent(q)}`);
+      const { contacts } = await res.json();
+      const el = document.getElementById('searchResults');
+      if (!contacts.length) {
+        el.innerHTML = '<div class="search-empty">No contacts found</div>';
+        return;
+      }
+      el.innerHTML = contacts.map(c => `
+        <div class="search-result" onclick="selectContact('${c.id}')">
+          <strong>${c.name || 'Unknown'}</strong>
+          <span>${[c.email, c.phone].filter(Boolean).join(' · ') || 'No contact details'}</span>
+        </div>`).join('');
+    } catch (_) {
+      document.getElementById('searchResults').innerHTML = '<div class="search-empty">Search failed. Try again.</div>';
+    }
+  }
+
+  function selectContact(contactId) {
+    window.location.href = `/qualify?location_id=${locationId}&contact_id=${contactId}`;
+  }
+
+  // Close modal on overlay click
+  document.getElementById('searchModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeSearch();
+  });
+</script>
+</body>
+</html>
