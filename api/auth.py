@@ -90,26 +90,42 @@ async def _refresh(location_id: str) -> str:
 
 async def get_valid_token(location_id: str) -> str:
     sb = _sb()
+
+    # Try direct location match first
     row = (
         sb.table("installations")
-        .select("access_token, expires_at")
+        .select("access_token, expires_at, location_id")
         .eq("location_id", location_id)
-        .single()
+        .maybeSingle()
         .execute()
     )
+
+    # Fall back to company-level install (agency token covers all sub-accounts)
+    if not row.data:
+        row = (
+            sb.table("installations")
+            .select("access_token, expires_at, location_id")
+            .eq("agency_id", location_id)
+            .maybeSingle()
+            .execute()
+        )
+
     if not row.data:
         raise ValueError(f"No installation found for location_id: {location_id}")
 
+    resolved_id = row.data["location_id"]
     expires_at = datetime.fromisoformat(row.data["expires_at"])
     if expires_at <= datetime.now(timezone.utc) + timedelta(minutes=5):
-        return await _refresh(location_id)
+        return await _refresh(resolved_id)
 
     return row.data["access_token"]
 
 
 async def save_installation(token_data: dict) -> str:
     sb = _sb()
-    location_id = token_data["locationId"]
+    location_id = token_data.get("locationId") or token_data.get("companyId")
+    if not location_id:
+        raise ValueError(f"No locationId or companyId in token response: {list(token_data.keys())}")
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data["expires_in"])
 
     sb.table("installations").upsert(
