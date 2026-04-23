@@ -91,34 +91,52 @@ async def _refresh(location_id: str) -> str:
 async def get_valid_token(location_id: str) -> str:
     sb = _sb()
 
+    def _first(rows) -> dict | None:
+        return rows.data[0] if rows.data else None
+
     # Try direct location match first
-    row = (
+    record = _first(
         sb.table("installations")
         .select("access_token, expires_at, location_id")
         .eq("location_id", location_id)
-        .maybe_single()
         .execute()
     )
 
     # Fall back to company-level install (agency token covers all sub-accounts)
-    if not row.data:
-        row = (
+    if not record:
+        record = _first(
             sb.table("installations")
             .select("access_token, expires_at, location_id")
             .eq("agency_id", location_id)
-            .maybe_single()
             .execute()
         )
 
-    if not row.data:
+    if not record:
         raise ValueError(f"No installation found for location_id: {location_id}")
 
-    resolved_id = row.data["location_id"]
-    expires_at = datetime.fromisoformat(row.data["expires_at"])
+    resolved_id = record["location_id"]
+    expires_at = datetime.fromisoformat(record["expires_at"])
     if expires_at <= datetime.now(timezone.utc) + timedelta(minutes=5):
         return await _refresh(resolved_id)
 
-    return row.data["access_token"]
+    return record["access_token"]
+
+
+async def ensure_location_installation(company_id: str, location_id: str) -> None:
+    """Copy company-level token row to a location row so FK constraints are satisfied."""
+    sb = _sb()
+    rows = sb.table("installations").select("*").eq("location_id", company_id).execute()
+    if not rows.data:
+        raise ValueError(f"No company installation found for: {company_id}")
+    src = rows.data[0]
+    sb.table("installations").upsert({
+        "location_id": location_id,
+        "agency_id": company_id,
+        "access_token": src["access_token"],
+        "refresh_token": src["refresh_token"],
+        "expires_at": src["expires_at"],
+        "uninstalled_at": None,
+    }).execute()
 
 
 async def save_installation(token_data: dict) -> str:

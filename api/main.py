@@ -73,12 +73,36 @@ async def oauth_callback(code: str = Query(...)):
 
 # ── Setup API ──────────────────────────────────────────────────────────────────
 
-@app.get("/api/setup/run")
-async def run_setup(location_id: str = Query(...)):
+@app.get("/api/setup/locations")
+async def list_setup_locations(location_id: str = Query(...)):
     try:
         token = await auth.get_valid_token(location_id)
+        locations = await ghl.list_locations(token, location_id)
+        return {
+            "locations": [
+                {"id": loc["id"], "name": loc.get("name", loc["id"])}
+                for loc in locations
+            ]
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/setup/run")
+async def run_setup(location_id: str = Query(...), company_id: str = Query(None)):
+    token_lookup_id = company_id or location_id
+    try:
+        token = await auth.get_valid_token(token_lookup_id)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Token lookup failed: {exc}")
+
+    # Company-level install: copy token row to the real location so FK constraint holds
+    if company_id and company_id != location_id:
+        try:
+            await auth.ensure_location_installation(company_id, location_id)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to register location: {exc}")
+
     return await app_setup.run(location_id, token)
 
 

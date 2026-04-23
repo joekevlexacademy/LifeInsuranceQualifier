@@ -79,6 +79,17 @@ async def create_note(access_token: str, contact_id: str, body: str) -> dict:
         return r.json()
 
 
+async def list_locations(access_token: str, company_id: str) -> list:
+    async with httpx.AsyncClient() as client:
+        r = await client.get(
+            f"{GHL_BASE}/locations/search",
+            headers=_headers(access_token),
+            params={"companyId": company_id, "limit": 100},
+        )
+        r.raise_for_status()
+        return r.json().get("locations", [])
+
+
 async def list_custom_fields(access_token: str, location_id: str) -> list:
     async with httpx.AsyncClient() as client:
         r = await client.get(

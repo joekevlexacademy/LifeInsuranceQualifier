@@ -106,6 +106,16 @@
     <button class="btn btn-primary" onclick="startOAuth()">Connect GoHighLevel →</button>
   </div>
 
+  <!-- Screen 1b: Location picker (company-level installs) -->
+  <div class="screen" id="s_pick">
+    <h2>Choose sub-account</h2>
+    <p class="sub">This app was installed at the agency level. Select the sub-account to configure.</p>
+    <select id="locationSelect" style="width:100%;padding:12px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:12px;color:#eef2ff;font:inherit;font-size:0.95rem;margin-bottom:24px;cursor:pointer;">
+    </select>
+    <button class="btn btn-primary" id="pickBtn">Continue →</button>
+    <div class="error-msg" id="pickError"></div>
+  </div>
+
   <!-- Screen 2: Auto-setup running -->
   <div class="screen" id="s2">
     <h2>Setting up…</h2>
@@ -155,22 +165,52 @@
     el.textContent = state === 'ok' ? '✓' : state === 'err' ? '✕' : state === 'spin' ? '↻' : '·';
   }
 
+  async function pickLocation(locations) {
+    return new Promise(resolve => {
+      const select = document.getElementById('locationSelect');
+      select.innerHTML = locations
+        .map(l => `<option value="${l.id}">${l.name}</option>`)
+        .join('');
+      show('s_pick');
+      document.getElementById('pickBtn').onclick = () => resolve(select.value);
+    });
+  }
+
   async function runSetup() {
     show('s2');
-    const icons = ['ic-f1','ic-f2','ic-f3','ic-f4','ic-f5','ic-save'];
 
-    // Fetch location name
+    let effectiveLocationId = locationId;
+    let companyId = null;
+
+    // Try to get location name; if it fails, this might be a company-level install
     try {
       const locRes = await fetch(`/api/location?location_id=${locationId}`);
-      const locData = await locRes.json();
-      document.getElementById('locationLabel').textContent = `Configuring ${locData.name || 'your sub-account'}…`;
+      if (locRes.ok) {
+        const locData = await locRes.json();
+        document.getElementById('locationLabel').textContent = `Configuring ${locData.name || 'your sub-account'}…`;
+      } else {
+        // Likely a company ID — fetch the locations list for this company
+        const locsRes = await fetch(`/api/setup/locations?location_id=${locationId}`);
+        if (locsRes.ok) {
+          const locsData = await locsRes.json();
+          if (locsData.locations?.length > 0) {
+            companyId = locationId;
+            effectiveLocationId = await pickLocation(locsData.locations);
+            show('s2');
+            const picked = locsData.locations.find(l => l.id === effectiveLocationId);
+            document.getElementById('locationLabel').textContent = `Configuring ${picked?.name || 'your sub-account'}…`;
+          }
+        }
+      }
     } catch (_) {}
 
-    // Run setup and animate steps
+    // Run setup
     markIcon('ic-f1', 'spin');
     let result;
     try {
-      const res = await fetch(`/api/setup/run?location_id=${locationId}`);
+      const params = new URLSearchParams({ location_id: effectiveLocationId });
+      if (companyId) params.set('company_id', companyId);
+      const res = await fetch(`/api/setup/run?${params}`);
       const text = await res.text();
       try {
         result = JSON.parse(text);
@@ -202,14 +242,15 @@
 
     if (result.success) {
       await new Promise(r => setTimeout(r, 600));
-      document.getElementById('openAppBtn').href = `/?location_id=${locationId}`;
-      document.getElementById('openAppBtn').onclick = () => { window.location.href = `/?location_id=${locationId}`; };
+      document.getElementById('openAppBtn').onclick = () => {
+        window.location.href = `/?location_id=${effectiveLocationId}`;
+      };
       show('s3');
     } else {
       const errEl = document.getElementById('setupError');
       errEl.style.display = 'block';
       const failed = result.steps.filter(s => !s.ok).map(s => s.label).join('; ');
-      errEl.textContent = `Setup failed: ${failed}. Check that your GHL API key has customFields.write permission, then retry.`;
+      errEl.textContent = `Setup failed: ${failed}`;
     }
   }
 
