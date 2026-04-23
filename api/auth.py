@@ -96,7 +96,7 @@ async def get_valid_token(location_id: str) -> str:
         sb.table("installations")
         .select("access_token, expires_at, location_id")
         .eq("location_id", location_id)
-        .maybeSingle()
+        .maybe_single()
         .execute()
     )
 
@@ -106,7 +106,7 @@ async def get_valid_token(location_id: str) -> str:
             sb.table("installations")
             .select("access_token, expires_at, location_id")
             .eq("agency_id", location_id)
-            .maybeSingle()
+            .maybe_single()
             .execute()
         )
 

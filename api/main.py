@@ -75,7 +75,10 @@ async def oauth_callback(code: str = Query(...)):
 
 @app.get("/api/setup/run")
 async def run_setup(location_id: str = Query(...)):
-    token = await auth.get_valid_token(location_id)
+    try:
+        token = await auth.get_valid_token(location_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Token lookup failed: {exc}")
     return await app_setup.run(location_id, token)
 
 
