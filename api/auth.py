@@ -10,7 +10,7 @@ GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token"
 # Set GHL_OAUTH_DOMAIN in Railway env vars if using a custom domain (e.g. app.hatch.insure).
 # Defaults to marketplace.gohighlevel.com if not set.
 _GHL_OAUTH_DOMAIN = os.environ.get("GHL_OAUTH_DOMAIN", "marketplace.gohighlevel.com")
-GHL_OAUTH_BASE = f"https://{_GHL_OAUTH_DOMAIN}/oauth/chooselocation"
+GHL_OAUTH_BASE = f"https://{_GHL_OAUTH_DOMAIN}/v2/oauth/chooselocation"
 
 GHL_SCOPES = " ".join([
     "contacts.readonly",
