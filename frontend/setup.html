@@ -109,10 +109,11 @@
   <!-- Screen 1b: Location picker (company-level installs) -->
   <div class="screen" id="s_pick">
     <h2>Choose sub-account</h2>
-    <p class="sub">This app was installed at the agency level. Select the sub-account to configure.</p>
+    <p class="sub">This app was installed at the agency level. Select the sub-account you want to configure, then click <strong>Connect</strong> to authorize direct access to it.</p>
     <select id="locationSelect" style="width:100%;padding:12px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:12px;color:#eef2ff;font:inherit;font-size:0.95rem;margin-bottom:24px;cursor:pointer;">
     </select>
-    <button class="btn btn-primary" id="pickBtn">Continue →</button>
+    <button class="btn btn-primary" id="pickBtn">Connect to Sub-Account →</button>
+    <p style="color:#9fb0d9;font-size:0.82rem;margin-top:12px;text-align:center;">You'll be taken to GoHighLevel to confirm access, then setup completes automatically.</p>
     <div class="error-msg" id="pickError"></div>
   </div>
 
@@ -165,22 +166,20 @@
     el.textContent = state === 'ok' ? '✓' : state === 'err' ? '✕' : state === 'spin' ? '↻' : '·';
   }
 
-  async function pickLocation(locations) {
-    return new Promise(resolve => {
-      const select = document.getElementById('locationSelect');
-      select.innerHTML = locations
-        .map(l => `<option value="${l.id}">${l.name}</option>`)
-        .join('');
-      show('s_pick');
-      document.getElementById('pickBtn').onclick = () => resolve(select.value);
-    });
+  function showLocationPicker(locations) {
+    const select = document.getElementById('locationSelect');
+    select.innerHTML = locations
+      .map(l => `<option value="${l.id}">${l.name}</option>`)
+      .join('');
+    show('s_pick');
+    // Clicking Connect redirects to OAuth so we get a location-level token
+    document.getElementById('pickBtn').onclick = () => {
+      window.location.href = '/oauth/start';
+    };
   }
 
   async function runSetup() {
     show('s2');
-
-    let effectiveLocationId = locationId;
-    let companyId = null;
 
     // Try to get location name; if it fails, this might be a company-level install
     try {
@@ -189,28 +188,23 @@
         const locData = await locRes.json();
         document.getElementById('locationLabel').textContent = `Configuring ${locData.name || 'your sub-account'}…`;
       } else {
-        // Likely a company ID — fetch the locations list for this company
+        // Company-level install: fetch location list and show picker
         const locsRes = await fetch(`/api/setup/locations?location_id=${locationId}`);
         if (locsRes.ok) {
           const locsData = await locsRes.json();
           if (locsData.locations?.length > 0) {
-            companyId = locationId;
-            effectiveLocationId = await pickLocation(locsData.locations);
-            show('s2');
-            const picked = locsData.locations.find(l => l.id === effectiveLocationId);
-            document.getElementById('locationLabel').textContent = `Configuring ${picked?.name || 'your sub-account'}…`;
+            showLocationPicker(locsData.locations);
+            return; // Stop here — OAuth redirect will bring us back with a location token
           }
         }
       }
     } catch (_) {}
 
-    // Run setup
+    // Run setup with the location token we have
     markIcon('ic-f1', 'spin');
     let result;
     try {
-      const params = new URLSearchParams({ location_id: effectiveLocationId });
-      if (companyId) params.set('company_id', companyId);
-      const res = await fetch(`/api/setup/run?${params}`);
+      const res = await fetch(`/api/setup/run?location_id=${locationId}`);
       const text = await res.text();
       try {
         result = JSON.parse(text);
@@ -243,7 +237,7 @@
     if (result.success) {
       await new Promise(r => setTimeout(r, 600));
       document.getElementById('openAppBtn').onclick = () => {
-        window.location.href = `/?location_id=${effectiveLocationId}`;
+        window.location.href = `/?location_id=${locationId}`;
       };
       show('s3');
     } else {
