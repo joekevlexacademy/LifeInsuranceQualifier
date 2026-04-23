@@ -6,7 +6,11 @@ import httpx
 from supabase import create_client
 
 GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token"
-GHL_OAUTH_BASE = "https://marketplace.gohighlevel.com/oauth/chooselocation"
+# Supports standard GHL domain and white-label custom domains.
+# Set GHL_OAUTH_DOMAIN in Railway env vars if using a custom domain (e.g. app.hatch.insure).
+# Defaults to marketplace.gohighlevel.com if not set.
+_GHL_OAUTH_DOMAIN = os.environ.get("GHL_OAUTH_DOMAIN", "marketplace.gohighlevel.com")
+GHL_OAUTH_BASE = f"https://{_GHL_OAUTH_DOMAIN}/oauth/chooselocation"
 
 GHL_SCOPES = " ".join([
     "contacts.readonly",
