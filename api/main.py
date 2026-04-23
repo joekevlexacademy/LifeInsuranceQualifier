@@ -55,8 +55,19 @@ async def oauth_start():
 
 @app.get("/oauth/callback")
 async def oauth_callback(code: str = Query(...)):
-    token_data = await auth.exchange_code(code)
-    location_id = await auth.save_installation(token_data)
+    try:
+        token_data = await auth.exchange_code(code)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"GHL token exchange failed: {exc}") from exc
+
+    try:
+        location_id = await auth.save_installation(token_data)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Supabase save failed: {exc} | token_data keys: {list(token_data.keys())}",
+        ) from exc
+
     return RedirectResponse(f"/setup?step=setup&location_id={location_id}")
 
 
