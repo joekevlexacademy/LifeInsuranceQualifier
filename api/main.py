@@ -68,6 +68,22 @@ async def oauth_callback(code: str = Query(...)):
             detail=f"Supabase save failed: {exc} | token_data keys: {list(token_data.keys())}",
         ) from exc
 
+    # Best-effort: create sidebar menu link if not already present
+    company_id = token_data.get("companyId", location_id)
+    try:
+        existing = await ghl.list_custom_menus(token_data["access_token"], company_id)
+        menu_name = "Life Insurance Qualifier"
+        if not any(m.get("name") == menu_name for m in existing):
+            menu_url = os.environ["APP_BASE_URL"] + "/?location_id={{location.id}}"
+            await ghl.create_custom_menu(
+                access_token=token_data["access_token"],
+                company_id=company_id,
+                name=menu_name,
+                url=menu_url,
+            )
+    except Exception:
+        pass  # non-critical; admin can add manually in GHL settings
+
     return RedirectResponse(f"/setup?step=setup&location_id={location_id}")
 
 

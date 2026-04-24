@@ -90,6 +90,39 @@ async def list_locations(access_token: str, company_id: str) -> list:
         return r.json().get("locations", [])
 
 
+async def list_custom_menus(access_token: str, company_id: str) -> list:
+    async with httpx.AsyncClient() as client:
+        r = await client.get(
+            f"{GHL_BASE}/custom-menus/",
+            headers=_headers(access_token),
+            params={"locationId": company_id},
+        )
+        r.raise_for_status()
+        data = r.json()
+        return data.get("customMenus") or data.get("menus") or []
+
+
+async def create_custom_menu(
+    access_token: str,
+    company_id: str,
+    name: str,
+    url: str,
+) -> dict:
+    async with httpx.AsyncClient() as client:
+        r = await client.post(
+            f"{GHL_BASE}/custom-menus/",
+            headers=_headers(access_token),
+            json={
+                "name": name,
+                "url": url,
+                "locationId": company_id,
+                "openMode": "NEW_TAB",
+            },
+        )
+        r.raise_for_status()
+        return r.json()
+
+
 async def list_custom_fields(access_token: str, location_id: str) -> list:
     async with httpx.AsyncClient() as client:
         r = await client.get(
