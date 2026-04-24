@@ -138,6 +138,13 @@ async def get_contact(location_id: str = Query(...), contact_id: str = Query(...
         "lastName": contact.get("lastName", ""),
         "email": contact.get("email", ""),
         "phone": contact.get("phone", ""),
+        "dateOfBirth": contact.get("dateOfBirth", ""),
+        "gender": contact.get("gender", ""),
+        "state": contact.get("state", ""),
+        "address1": contact.get("address1", ""),
+        "city": contact.get("city", ""),
+        "postalCode": contact.get("postalCode", ""),
+        "companyName": contact.get("companyName", ""),
     }
 
 

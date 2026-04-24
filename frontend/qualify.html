@@ -419,6 +419,26 @@
         document.getElementById('contactName').textContent = name;
         document.getElementById('contactAvatar').textContent = name.charAt(0).toUpperCase();
         document.getElementById('contactMeta').textContent = [c.email, c.phone].filter(Boolean).join(' · ') || 'No contact details on file';
+
+        // Pre-fill applicant basics
+        if (c.state) document.getElementById('state').value = c.state;
+
+        if (c.dateOfBirth) {
+          const dob = new Date(c.dateOfBirth);
+          if (!isNaN(dob)) {
+            const ageDays = (Date.now() - dob.getTime()) / 86400000;
+            const age = Math.floor(ageDays / 365.25);
+            if (age > 0 && age < 120) document.getElementById('age').value = age;
+          }
+        }
+
+        if (c.gender) {
+          const g = c.gender.toLowerCase();
+          const mapped = g === 'male' || g === 'm' ? 'Male' : g === 'female' || g === 'f' ? 'Female' : '';
+          if (mapped) document.getElementById('sexAtBirth').value = mapped;
+        }
+
+        renderState();
       })
       .catch(() => {
         document.getElementById('contactName').textContent = 'Contact';
