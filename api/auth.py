@@ -13,11 +13,9 @@ _GHL_OAUTH_DOMAIN = os.environ.get("GHL_OAUTH_DOMAIN", "marketplace.gohighlevel.
 GHL_OAUTH_BASE = f"https://{_GHL_OAUTH_DOMAIN}/v2/oauth/chooselocation"
 
 GHL_SCOPES = " ".join([
-    "contacts.readonly",
-    "contacts.write",
     "locations.readonly",
-    "locations/customFields.readonly",
-    "locations/customFields.write",
+    "custom-menu-link.readonly",
+    "custom-menu-link.write",
 ])
 
 
