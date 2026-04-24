@@ -68,23 +68,45 @@ async def oauth_callback(code: str = Query(...)):
             detail=f"Supabase save failed: {exc} | token_data keys: {list(token_data.keys())}",
         ) from exc
 
-    # Best-effort: create sidebar menu link if not already present
-    company_id = token_data.get("companyId", location_id)
-    try:
-        existing = await ghl.list_custom_menus(token_data["access_token"], company_id)
-        menu_name = "Life Insurance Qualifier"
-        if not any(m.get("name") == menu_name for m in existing):
-            menu_url = os.environ["APP_BASE_URL"] + "/?location_id={{location.id}}"
-            await ghl.create_custom_menu(
-                access_token=token_data["access_token"],
-                company_id=company_id,
-                name=menu_name,
-                url=menu_url,
-            )
-    except Exception:
-        pass  # non-critical; admin can add manually in GHL settings
+    company_id = token_data.get("companyId")
+    redirect_url = f"/setup?step=setup&location_id={location_id}"
+    if company_id and company_id != location_id:
+        redirect_url += f"&company_id={company_id}"
+    return RedirectResponse(redirect_url)
 
-    return RedirectResponse(f"/setup?step=setup&location_id={location_id}")
+
+# ── Debug ─────────────────────────────────────────────────────────────────────
+
+@app.get("/api/debug/menu")
+async def debug_menu(location_id: str = Query(...)):
+    """Attempt custom menu list + create and return raw GHL response for debugging."""
+    token = await auth.get_valid_token(location_id)
+    result: dict = {}
+    try:
+        existing = await ghl.list_custom_menus(token, location_id)
+        result["existing"] = existing
+    except Exception as exc:
+        result["list_error"] = str(exc)
+        return result
+
+    menu_name = "Life Insurance Qualifier"
+    if any(m.get("name") == menu_name for m in existing):
+        result["status"] = "already_exists"
+        return result
+
+    try:
+        menu_url = os.environ["APP_BASE_URL"] + "/?location_id={{location.id}}"
+        created = await ghl.create_custom_menu(
+            access_token=token,
+            company_id=location_id,
+            name=menu_name,
+            url=menu_url,
+        )
+        result["created"] = created
+        result["status"] = "created"
+    except Exception as exc:
+        result["create_error"] = str(exc)
+    return result
 
 
 # ── Setup API ──────────────────────────────────────────────────────────────────
@@ -118,7 +140,8 @@ async def run_setup(location_id: str = Query(...), company_id: str = Query(None)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"Failed to register location: {exc}")
 
-    return await app_setup.run(location_id, token)
+    # token is the agency OAuth token — it has custom-menu-link.write scope
+    return await app_setup.run(location_id, token, company_id=company_id, agency_token=token)
 
 
 @app.post("/api/setup/run")
@@ -132,7 +155,16 @@ async def run_setup_with_key(
         await auth.save_api_key_installation(company_id or location_id, location_id, api_key)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to save API key: {exc}")
-    return await app_setup.run(location_id, api_key)
+
+    # PIK is location-scoped and lacks custom-menu-link.write; fetch the agency OAuth token separately
+    agency_tok: str | None = None
+    if company_id:
+        try:
+            agency_tok = await auth.get_valid_token(company_id)
+        except Exception:
+            pass
+
+    return await app_setup.run(location_id, api_key, company_id=company_id, agency_token=agency_tok)
 
 
 # ── App API ────────────────────────────────────────────────────────────────────

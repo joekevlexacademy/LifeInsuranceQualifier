@@ -37,3 +37,9 @@ create table if not exists qualifications (
 
 create index if not exists qualifications_location_time
   on qualifications(location_id, qualified_at desc);
+
+-- Only the service role key (server-side) can access these tables.
+-- No policies needed — RLS with zero policies denies all non-service-role access.
+alter table installations   enable row level security;
+alter table location_config enable row level security;
+alter table qualifications  enable row level security;

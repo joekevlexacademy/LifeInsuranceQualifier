@@ -143,6 +143,7 @@
       <li id="step-f3"><span class="check-icon" id="ic-f3">·</span> Creating LIQ Active Dependencies field</li>
       <li id="step-f4"><span class="check-icon" id="ic-f4">·</span> Creating LIQ Coverage Amount field</li>
       <li id="step-f5"><span class="check-icon" id="ic-f5">·</span> Creating LIQ Product Type field</li>
+      <li id="step-menu"><span class="check-icon" id="ic-menu">·</span> Adding sidebar menu link</li>
       <li id="step-save"><span class="check-icon" id="ic-save">·</span> Saving configuration</li>
     </ul>
     <div class="error-msg" id="setupError"></div>
@@ -164,6 +165,7 @@
   const params = new URLSearchParams(location.search);
   const step = params.get('step');
   const locationId = params.get('location_id');
+  const companyId = params.get('company_id');
 
   function show(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -197,13 +199,20 @@
   }
 
   async function animateAndFinish(result, effectiveLocationId) {
+    // steps[0..4] = 5 custom fields
     const fieldIcons = ['ic-f1','ic-f2','ic-f3','ic-f4','ic-f5'];
-    const fieldSteps = result.steps.slice(0, 5);
-    for (let i = 0; i < fieldSteps.length; i++) {
+    for (let i = 0; i < 5; i++) {
       if (i > 0) markIcon(fieldIcons[i], 'spin');
       await new Promise(r => setTimeout(r, 350));
-      markIcon(fieldIcons[i], fieldSteps[i].ok ? 'ok' : 'err');
+      const s = result.steps[i];
+      markIcon(fieldIcons[i], s ? (s.ok ? 'ok' : 'err') : 'ok');
     }
+    // steps[5] = sidebar menu link
+    markIcon('ic-menu', 'spin');
+    await new Promise(r => setTimeout(r, 350));
+    const menuStep = result.steps[5];
+    markIcon('ic-menu', menuStep ? (menuStep.ok ? 'ok' : 'err') : 'ok');
+    // steps[6] = config save
     markIcon('ic-save', 'spin');
     await new Promise(r => setTimeout(r, 300));
     markIcon('ic-save', result.success ? 'ok' : 'err');
@@ -217,7 +226,8 @@
     } else {
       const errEl = document.getElementById('setupError');
       errEl.style.display = 'block';
-      errEl.textContent = `Setup failed: ${result.steps.filter(s => !s.ok).map(s => s.label).join('; ')}`;
+      const failed = result.steps.filter(s => !s.ok).map(s => s.label).join('; ');
+      errEl.textContent = `Setup failed: ${failed}`;
     }
   }
 
@@ -280,7 +290,9 @@
     // Normal location-level install — run setup directly
     markIcon('ic-f1', 'spin');
     try {
-      const result = await callSetup(`/api/setup/run?location_id=${locationId}`);
+      const qs = new URLSearchParams({ location_id: locationId });
+      if (companyId) qs.set('company_id', companyId);
+      const result = await callSetup(`/api/setup/run?${qs}`);
       await animateAndFinish(result, locationId);
     } catch (e) {
       document.getElementById('setupError').style.display = 'block';

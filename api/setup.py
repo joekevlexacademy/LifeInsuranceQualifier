@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timezone
+from typing import Optional
 
 from supabase import create_client
 
@@ -34,8 +35,15 @@ FIELDS = [
     },
 ]
 
+MENU_NAME = "Life Insurance Qualifier"
 
-async def run(location_id: str, access_token: str) -> dict:
+
+async def run(
+    location_id: str,
+    access_token: str,
+    company_id: Optional[str] = None,
+    agency_token: Optional[str] = None,
+) -> dict:
     sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
     steps = []
     config: dict = {"location_id": location_id}
@@ -69,8 +77,29 @@ async def run(location_id: str, access_token: str) -> dict:
         except Exception as exc:
             steps.append({"label": f"{label} field failed: {exc}", "ok": False})
 
+    # steps[0..4] = the 5 fields. Compute all_ok before adding further steps.
     all_ok = all(s["ok"] for s in steps)
 
+    # steps[5] — sidebar menu link (non-blocking: failure won't prevent config save)
+    menu_token = agency_token or access_token
+    menu_cid = company_id or location_id
+    try:
+        existing_menus = await ghl.list_custom_menus(menu_token, menu_cid)
+        if any(m.get("name") == MENU_NAME for m in existing_menus):
+            steps.append({"label": "Sidebar menu link found", "ok": True})
+        else:
+            menu_url = os.environ["APP_BASE_URL"] + "/?location_id={{location.id}}"
+            await ghl.create_custom_menu(
+                access_token=menu_token,
+                company_id=menu_cid,
+                name=MENU_NAME,
+                url=menu_url,
+            )
+            steps.append({"label": "Sidebar menu link created", "ok": True})
+    except Exception as exc:
+        steps.append({"label": f"Sidebar menu link failed: {exc}", "ok": False})
+
+    # steps[6] — config save
     if all_ok:
         config["setup_complete"] = True
         config["setup_at"] = datetime.now(timezone.utc).isoformat()
