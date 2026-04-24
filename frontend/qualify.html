@@ -83,6 +83,8 @@
       border-color: var(--accent); box-shadow: 0 0 0 4px rgba(122,162,255,0.16);
     }
     textarea { min-height: 104px; resize: vertical; }
+    ::placeholder { color: rgba(122, 145, 200, 0.4); opacity: 1; }
+    select.ph { color: rgba(122, 145, 200, 0.4); }
     .options, .check-grid { display: grid; gap: 10px; }
     .options.inline { grid-template-columns: repeat(auto-fit,minmax(135px,1fr)); }
     .check-grid { grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); }
@@ -440,6 +442,22 @@
           if (mapped) document.getElementById('sexAtBirth').value = mapped;
         }
 
+        // Pre-fill previously saved LIQ qualification fields
+        const liq = c.liq || {};
+        const _set = (id, val) => { if (val) { const el = document.getElementById(id); if (el) el.value = val; } };
+        _set('coverageAmount',    liq.coverage_amount);
+        _set('productType',       liq.product_type);
+        _set('budget',            liq.budget);
+        _set('urgency',           liq.urgency);
+        _set('occupation',        liq.occupation);
+        _set('height',            liq.height);
+        _set('weight',            liq.weight);
+        _set('medList',           liq.med_list);
+        _set('existingCoverage',  liq.existing_coverage);
+        _set('priorOutcome',      liq.prior_outcome);
+        _set('underwritingNotes', liq.underwriting_notes);
+
+        updateSelectColors();
         renderState();
       })
       .catch(() => {
@@ -534,14 +552,25 @@
       <div class="summary-item"><strong>Advisor notes</strong><ul style="margin:8px 0 0 18px;padding:0;color:var(--muted);line-height:1.55;">${notes.map(n=>`<li>${n}</li>`).join('')}</ul></div>`;
   }
 
+  function updateSelectColors() {
+    document.querySelectorAll('select').forEach(s => {
+      s.value ? s.classList.remove('ph') : s.classList.add('ph');
+    });
+  }
+
   document.querySelectorAll('input,select,textarea').forEach(el => {
     el.addEventListener('input', renderState);
     el.addEventListener('change', renderState);
   });
+  document.querySelectorAll('select').forEach(s => {
+    s.addEventListener('change', updateSelectColors);
+  });
+  updateSelectColors();
 
   function resetForm() {
     document.getElementById('lifeForm').reset();
     document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    updateSelectColors();
     renderState();
   }
 

@@ -199,6 +199,32 @@ async def get_location(location_id: str = Query(...)):
 async def get_contact(location_id: str = Query(...), contact_id: str = Query(...)):
     token = await auth.get_valid_token(location_id)
     contact = await ghl.get_contact(token, contact_id)
+    cfg = app_config.get_config(location_id)
+
+    # Build a name→value map for previously-saved LIQ custom fields so the
+    # qualify form can be pre-filled when reopening an existing contact.
+    liq: dict = {}
+    if cfg:
+        _liq_keys = {
+            cfg.get("field_coverage_amount_id"): "coverage_amount",
+            cfg.get("field_product_type_id"):    "product_type",
+            cfg.get("field_budget_id"):           "budget",
+            cfg.get("field_urgency_id"):          "urgency",
+            cfg.get("field_occupation_id"):       "occupation",
+            cfg.get("field_height_id"):           "height",
+            cfg.get("field_weight_id"):           "weight",
+            cfg.get("field_medications_id"):      "med_list",
+            cfg.get("field_existing_coverage_id"): "existing_coverage",
+            cfg.get("field_prior_outcome_id"):    "prior_outcome",
+            cfg.get("field_underwriting_notes_id"): "underwriting_notes",
+        }
+        _liq_keys.pop(None, None)  # remove any unconfigured fields
+        for cf in (contact.get("customFields") or []):
+            fid = cf.get("id")
+            val = cf.get("value") or cf.get("fieldValue") or ""
+            if fid in _liq_keys and val:
+                liq[_liq_keys[fid]] = val
+
     return {
         "id": contact.get("id"),
         "firstName": contact.get("firstName", ""),
@@ -212,6 +238,7 @@ async def get_contact(location_id: str = Query(...), contact_id: str = Query(...
         "city": contact.get("city", ""),
         "postalCode": contact.get("postalCode", ""),
         "companyName": contact.get("companyName", ""),
+        "liq": liq,
     }
 
 
