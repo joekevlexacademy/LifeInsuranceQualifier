@@ -16,9 +16,8 @@ GHL_SCOPES = " ".join([
     "contacts.readonly",
     "contacts.write",
     "locations.readonly",
-    "customFields.readonly",
-    "customFields.write",
-    "notes.write",
+    "locations/customFields.readonly",
+    "locations/customFields.write",
 ])
 
 
