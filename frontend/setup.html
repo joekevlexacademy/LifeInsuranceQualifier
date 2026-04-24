@@ -201,17 +201,18 @@
   async function animateAndFinish(result, effectiveLocationId) {
     // steps[0..4] = 5 custom fields
     const fieldIcons = ['ic-f1','ic-f2','ic-f3','ic-f4','ic-f5'];
+    const fallback = result.success ? 'ok' : 'err';
     for (let i = 0; i < 5; i++) {
       if (i > 0) markIcon(fieldIcons[i], 'spin');
       await new Promise(r => setTimeout(r, 350));
       const s = result.steps[i];
-      markIcon(fieldIcons[i], s ? (s.ok ? 'ok' : 'err') : 'ok');
+      markIcon(fieldIcons[i], s ? (s.ok ? 'ok' : 'err') : fallback);
     }
     // steps[5] = sidebar menu link
     markIcon('ic-menu', 'spin');
     await new Promise(r => setTimeout(r, 350));
     const menuStep = result.steps[5];
-    markIcon('ic-menu', menuStep ? (menuStep.ok ? 'ok' : 'err') : 'ok');
+    markIcon('ic-menu', menuStep ? (menuStep.ok ? 'ok' : 'err') : fallback);
     // steps[6] = config save
     markIcon('ic-save', 'spin');
     await new Promise(r => setTimeout(r, 300));

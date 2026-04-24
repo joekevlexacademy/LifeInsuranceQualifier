@@ -152,13 +152,18 @@ async def get_valid_token(location_id: str) -> str:
 
 
 async def ensure_location_installation(company_id: str, location_id: str) -> None:
-    """Copy company-level token row to a location row so FK constraints are satisfied."""
+    """Create a location row from the company token only if one does not already exist.
+    Never overwrites an existing row so stored PIKs are never clobbered."""
     sb = _sb()
+    # If a row already exists for this location (e.g. a PIK was saved), leave it alone.
+    existing = sb.table("installations").select("location_id").eq("location_id", location_id).execute()
+    if existing.data:
+        return
     rows = sb.table("installations").select("*").eq("location_id", company_id).execute()
     if not rows.data:
         raise ValueError(f"No company installation found for: {company_id}")
     src = rows.data[0]
-    sb.table("installations").upsert({
+    sb.table("installations").insert({
         "location_id": location_id,
         "agency_id": company_id,
         "access_token": src["access_token"],
