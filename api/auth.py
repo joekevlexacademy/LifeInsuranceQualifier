@@ -99,6 +99,20 @@ async def save_api_key_installation(company_id: str, location_id: str, api_key: 
     }).execute()
 
 
+async def get_agency_id(location_id: str) -> str | None:
+    """Look up the company/agency id stored alongside a location's installation row."""
+    sb = _sb()
+    rows = (
+        sb.table("installations")
+        .select("agency_id")
+        .eq("location_id", location_id)
+        .execute()
+    )
+    if rows.data and rows.data[0].get("agency_id"):
+        return rows.data[0]["agency_id"]
+    return None
+
+
 async def get_valid_token(location_id: str) -> str:
     sb = _sb()
 

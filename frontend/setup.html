@@ -217,17 +217,22 @@
     await new Promise(r => setTimeout(r, 300));
     markIcon('ic-save', result.success ? 'ok' : 'err');
 
+    // Always surface the label of any failed step, even non-blocking ones (e.g. menu).
+    const failed = result.steps.filter(s => !s.ok);
+    if (failed.length > 0) {
+      const errEl = document.getElementById('setupError');
+      errEl.style.display = 'block';
+      const prefix = result.success ? 'Warning' : 'Setup failed';
+      errEl.textContent = `${prefix}: ${failed.map(s => s.label).join(' | ')}`;
+    }
+
     if (result.success) {
-      await new Promise(r => setTimeout(r, 600));
+      // Pause longer when there's a warning so the user can read it before auto-advance.
+      await new Promise(r => setTimeout(r, failed.length > 0 ? 3500 : 600));
       document.getElementById('openAppBtn').onclick = () => {
         window.location.href = `/?location_id=${effectiveLocationId}`;
       };
       show('s3');
-    } else {
-      const errEl = document.getElementById('setupError');
-      errEl.style.display = 'block';
-      const failed = result.steps.filter(s => !s.ok).map(s => s.label).join('; ');
-      errEl.textContent = `Setup failed: ${failed}`;
     }
   }
 

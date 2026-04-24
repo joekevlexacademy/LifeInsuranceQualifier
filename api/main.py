@@ -128,20 +128,33 @@ async def list_setup_locations(location_id: str = Query(...)):
 
 @app.get("/api/setup/run")
 async def run_setup(location_id: str = Query(...), company_id: str = Query(None)):
-    token_lookup_id = company_id or location_id
+    # Token for field operations (may be a PIK or an OAuth token)
     try:
-        token = await auth.get_valid_token(token_lookup_id)
+        location_token = await auth.get_valid_token(location_id)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Token lookup failed: {exc}")
 
-    if company_id and company_id != location_id:
-        try:
-            await auth.ensure_location_installation(company_id, location_id)
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"Failed to register location: {exc}")
+    # Derive company_id from the installation row if caller didn't pass one
+    if not company_id:
+        company_id = await auth.get_agency_id(location_id)
 
-    # token is the agency OAuth token — it has custom-menu-link.write scope
-    return await app_setup.run(location_id, token, company_id=company_id, agency_token=token)
+    # Menu creation needs the agency OAuth token (custom-menu-link.write).
+    # If the location row IS the agency row, reuse its token; otherwise look it up.
+    agency_token: str | None = None
+    if company_id:
+        if company_id == location_id:
+            agency_token = location_token
+        else:
+            try:
+                agency_token = await auth.get_valid_token(company_id)
+            except Exception:
+                agency_token = None
+            try:
+                await auth.ensure_location_installation(company_id, location_id)
+            except Exception as exc:
+                raise HTTPException(status_code=500, detail=f"Failed to register location: {exc}")
+
+    return await app_setup.run(location_id, location_token, company_id=company_id, agency_token=agency_token)
 
 
 @app.post("/api/setup/run")
@@ -151,6 +164,10 @@ async def run_setup_with_key(
     api_key: str = Body(..., embed=True),
 ):
     """Setup using a GHL Private Integration key (for agency-level installs)."""
+    # If caller didn't pass company_id, try to derive it from an existing install row
+    if not company_id:
+        company_id = await auth.get_agency_id(location_id)
+
     try:
         await auth.save_api_key_installation(company_id or location_id, location_id, api_key)
     except Exception as exc:
@@ -158,7 +175,7 @@ async def run_setup_with_key(
 
     # PIK is location-scoped and lacks custom-menu-link.write; fetch the agency OAuth token separately
     agency_tok: str | None = None
-    if company_id:
+    if company_id and company_id != location_id:
         try:
             agency_tok = await auth.get_valid_token(company_id)
         except Exception:
