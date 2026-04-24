@@ -133,13 +133,17 @@
     <div class="error-msg" id="pickError"></div>
   </div>
 
-  <!-- Screen 1c: Private Integration key (company-level installs) -->
+  <!-- Screen 1c: Private Integration key -->
   <div class="screen" id="s_key">
-    <h2>API key required</h2>
-    <p class="sub">To create custom fields in <strong id="pickedName"></strong>, enter a Private Integration key for that sub-account.</p>
+    <h2>Private Integration key</h2>
+    <p class="sub">Required to create qualification fields inside <strong id="pickedName"></strong>.</p>
     <div class="note">
-      <strong>How to get it:</strong><br>
-      In GHL, switch to the sub-account → <strong>Settings → Private Integrations</strong> → create a new key (or copy an existing one) → paste below.
+      <strong>How to create one in GHL:</strong><br><br>
+      1. In GHL, click the sub-account name in the top-left to switch <em>into</em> the sub-account (not the agency view).<br><br>
+      2. Go to <strong>Settings → Private Integrations</strong> (left sidebar, under Integrations).<br><br>
+      3. Click <strong>+ New Integration</strong>, give it any name (e.g. <em>Life Insurance Qualifier</em>), and save.<br><br>
+      4. Copy the key that appears and paste it below.<br><br>
+      <strong>Required scopes:</strong> Contacts, Custom Fields, Notes (select all if unsure).
     </div>
     <input type="password" id="apiKeyInput"
       placeholder="Paste Private Integration key…"
