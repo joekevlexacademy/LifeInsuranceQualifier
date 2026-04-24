@@ -90,6 +90,42 @@ async def list_locations(access_token: str, company_id: str) -> list:
         return r.json().get("locations", [])
 
 
+async def list_custom_field_groups(access_token: str, location_id: str) -> list:
+    async with httpx.AsyncClient() as client:
+        r = await client.get(
+            f"{GHL_BASE}/locations/{location_id}/customFieldGroups",
+            headers=_headers(access_token),
+        )
+        r.raise_for_status()
+        data = r.json()
+        return data.get("groups") or data.get("fieldGroups") or []
+
+
+async def create_custom_field_group(access_token: str, location_id: str, name: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        r = await client.post(
+            f"{GHL_BASE}/locations/{location_id}/customFieldGroups",
+            headers=_headers(access_token),
+            json={"name": name, "model": "contact"},
+        )
+        r.raise_for_status()
+        data = r.json()
+        return data.get("fieldGroup") or data.get("group") or {}
+
+
+async def update_custom_field(
+    access_token: str, location_id: str, field_id: str, data: dict
+) -> dict:
+    async with httpx.AsyncClient() as client:
+        r = await client.put(
+            f"{GHL_BASE}/locations/{location_id}/customFields/{field_id}",
+            headers=_headers(access_token),
+            json=data,
+        )
+        r.raise_for_status()
+        return r.json().get("customField", {})
+
+
 async def list_custom_fields(access_token: str, location_id: str) -> list:
     async with httpx.AsyncClient() as client:
         r = await client.get(
@@ -106,10 +142,13 @@ async def create_custom_field(
     name: str,
     data_type: str,
     options: Optional[list] = None,
+    group_id: Optional[str] = None,
 ) -> dict:
     payload: dict = {"name": name, "dataType": data_type, "model": "contact"}
     if options:
         payload["options"] = options
+    if group_id:
+        payload["groupId"] = group_id
     async with httpx.AsyncClient() as client:
         r = await client.post(
             f"{GHL_BASE}/locations/{location_id}/customFields",

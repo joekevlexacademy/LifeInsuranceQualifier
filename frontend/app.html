@@ -220,8 +220,13 @@
   async function doSearch(q) {
     try {
       const res = await fetch(`/api/contacts/search?location_id=${locationId}&q=${encodeURIComponent(q)}`);
-      const { contacts } = await res.json();
+      const data = await res.json();
       const el = document.getElementById('searchResults');
+      if (!res.ok) {
+        el.innerHTML = `<div class="search-empty">Search error: ${data.detail || res.status}</div>`;
+        return;
+      }
+      const { contacts } = data;
       if (!contacts.length) {
         el.innerHTML = '<div class="search-empty">No contacts found</div>';
         return;
@@ -231,8 +236,8 @@
           <strong>${c.name || 'Unknown'}</strong>
           <span>${[c.email, c.phone].filter(Boolean).join(' · ') || 'No contact details'}</span>
         </div>`).join('');
-    } catch (_) {
-      document.getElementById('searchResults').innerHTML = '<div class="search-empty">Search failed. Try again.</div>';
+    } catch (e) {
+      document.getElementById('searchResults').innerHTML = `<div class="search-empty">Search failed: ${e.message}</div>`;
     }
   }
 

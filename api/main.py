@@ -143,8 +143,11 @@ async def get_contact(location_id: str = Query(...), contact_id: str = Query(...
 
 @app.get("/api/contacts/search")
 async def search_contacts(location_id: str = Query(...), q: str = Query(...)):
-    token = await auth.get_valid_token(location_id)
-    contacts = await ghl.search_contacts(token, location_id, q)
+    try:
+        token = await auth.get_valid_token(location_id)
+        contacts = await ghl.search_contacts(token, location_id, q)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
     return {
         "contacts": [
             {

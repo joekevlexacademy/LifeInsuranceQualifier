@@ -5,6 +5,8 @@ from supabase import create_client
 
 from . import ghl
 
+GROUP_NAME = "Life Insurance Qualifier"
+
 FIELDS = [
     {
         "name": "LIQ Triage State",
@@ -35,6 +37,18 @@ FIELDS = [
 ]
 
 
+async def _get_or_create_group(access_token: str, location_id: str) -> str | None:
+    try:
+        groups = await ghl.list_custom_field_groups(access_token, location_id)
+        for g in groups:
+            if g.get("name") == GROUP_NAME:
+                return g["id"]
+        result = await ghl.create_custom_field_group(access_token, location_id, GROUP_NAME)
+        return result.get("id")
+    except Exception:
+        return None
+
+
 async def run(location_id: str, access_token: str) -> dict:
     sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
     steps = []
@@ -50,11 +64,21 @@ async def run(location_id: str, access_token: str) -> dict:
             "success": False,
         }
 
+    group_id = await _get_or_create_group(access_token, location_id)
+
     for field_def in FIELDS:
         label = field_def["name"]
         try:
             if label in existing_by_name:
-                config[field_def["config_key"]] = existing_by_name[label]["id"]
+                field_id = existing_by_name[label]["id"]
+                config[field_def["config_key"]] = field_id
+                if group_id:
+                    try:
+                        await ghl.update_custom_field(
+                            access_token, location_id, field_id, {"groupId": group_id}
+                        )
+                    except Exception:
+                        pass
                 steps.append({"label": f"{label} field found", "ok": True})
             else:
                 result = await ghl.create_custom_field(
@@ -63,6 +87,7 @@ async def run(location_id: str, access_token: str) -> dict:
                     name=label,
                     data_type=field_def["data_type"],
                     options=field_def.get("options"),
+                    group_id=group_id,
                 )
                 config[field_def["config_key"]] = result["id"]
                 steps.append({"label": f"{label} field created", "ok": True})
