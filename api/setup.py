@@ -83,6 +83,7 @@ async def run(
     # steps[5] — sidebar menu link (non-blocking: failure won't prevent config save)
     menu_token = agency_token or access_token
     menu_cid = company_id or location_id
+    menu_url: str = ""
     try:
         existing_menus = await ghl.list_custom_menus(menu_token, menu_cid)
         if any(
@@ -92,6 +93,8 @@ async def run(
             steps.append({"label": "Sidebar menu link found", "ok": True})
         else:
             base = os.environ["APP_BASE_URL"].rstrip("/")
+            if not base.startswith("http"):
+                base = "https://" + base
             menu_url = f"{base}/?location_id={location_id}"
             await ghl.create_custom_menu(
                 access_token=menu_token,
@@ -102,7 +105,7 @@ async def run(
             )
             steps.append({"label": "Sidebar menu link created", "ok": True})
     except Exception as exc:
-        steps.append({"label": f"Sidebar menu link failed: {exc}", "ok": False})
+        steps.append({"label": f"Sidebar menu link failed: {exc} [url={menu_url!r}]", "ok": False})
 
     # steps[6] — config save
     if all_ok:
