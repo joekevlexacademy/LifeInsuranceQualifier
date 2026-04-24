@@ -33,6 +33,54 @@ FIELDS = [
         "data_type": "TEXT",
         "config_key": "field_product_type_id",
     },
+    {
+        "name": "LIQ Budget",
+        "data_type": "TEXT",
+        "config_key": "field_budget_id",
+    },
+    {
+        "name": "LIQ Urgency",
+        "data_type": "SINGLE_OPTIONS",
+        "options": ["Immediately", "Within 30 days", "Within 60 days", "Just exploring"],
+        "config_key": "field_urgency_id",
+    },
+    {
+        "name": "LIQ Occupation",
+        "data_type": "TEXT",
+        "config_key": "field_occupation_id",
+    },
+    {
+        "name": "LIQ Height",
+        "data_type": "TEXT",
+        "config_key": "field_height_id",
+    },
+    {
+        "name": "LIQ Weight",
+        "data_type": "TEXT",
+        "config_key": "field_weight_id",
+    },
+    {
+        "name": "LIQ Medications",
+        "data_type": "LARGE_TEXT",
+        "config_key": "field_medications_id",
+    },
+    {
+        "name": "LIQ Existing Coverage",
+        "data_type": "SINGLE_OPTIONS",
+        "options": ["No current coverage", "Some coverage in force", "Actively replacing coverage"],
+        "config_key": "field_existing_coverage_id",
+    },
+    {
+        "name": "LIQ Prior Outcome",
+        "data_type": "SINGLE_OPTIONS",
+        "options": ["No recent application", "Approved as applied", "Rated", "Postponed", "Declined"],
+        "config_key": "field_prior_outcome_id",
+    },
+    {
+        "name": "LIQ Underwriting Notes",
+        "data_type": "LARGE_TEXT",
+        "config_key": "field_underwriting_notes_id",
+    },
 ]
 
 MENU_NAME = "Life Insurance Qualifier"
@@ -77,10 +125,10 @@ async def run(
         except Exception as exc:
             steps.append({"label": f"{label} field failed: {exc}", "ok": False})
 
-    # steps[0..4] = the 5 fields. Compute all_ok before adding further steps.
+    # steps[0..13] = the 14 fields. Compute all_ok before adding further steps.
     all_ok = all(s["ok"] for s in steps)
 
-    # steps[5] — sidebar menu link (non-blocking: failure won't prevent config save)
+    # steps[14] — sidebar menu link (non-blocking: failure won't prevent config save)
     menu_token = agency_token or access_token
     menu_cid = company_id or location_id
     menu_url: str = ""
@@ -107,7 +155,7 @@ async def run(
     except Exception as exc:
         steps.append({"label": f"Sidebar menu link failed: {exc} [url={menu_url!r}]", "ok": False})
 
-    # steps[6] — config save
+    # steps[15] — config save
     if all_ok:
         config["setup_complete"] = True
         config["setup_at"] = datetime.now(timezone.utc).isoformat()

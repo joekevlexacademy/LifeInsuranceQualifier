@@ -280,14 +280,34 @@ async def submit_qualification(payload: QualificationSubmission):
         "field_active_deps_id": payload.active_dependencies,
         "field_coverage_amount_id": payload.coverage_amount,
         "field_product_type_id": payload.product_type,
+        "field_budget_id": payload.budget,
+        "field_urgency_id": payload.urgency,
+        "field_occupation_id": payload.occupation,
+        "field_height_id": payload.height,
+        "field_weight_id": payload.weight,
+        "field_medications_id": payload.med_list,
+        "field_existing_coverage_id": payload.existing_coverage,
+        "field_prior_outcome_id": payload.prior_outcome,
+        "field_underwriting_notes_id": payload.underwriting_notes,
     }
     custom_fields = [
         {"id": cfg[cfg_key], "value": value}
         for cfg_key, value in field_map.items()
         if cfg.get(cfg_key) and value
     ]
-    if custom_fields:
-        await ghl.update_contact_fields(token, contact_id, custom_fields)
+
+    # Standard GHL contact fields (written back, not just read)
+    extra: dict = {}
+    if payload.state:
+        extra["state"] = payload.state
+    if payload.sex_at_birth:
+        _gender_map = {"Male": "male", "Female": "female"}
+        ghl_gender = _gender_map.get(payload.sex_at_birth)
+        if ghl_gender:
+            extra["gender"] = ghl_gender
+
+    if custom_fields or extra:
+        await ghl.update_contact_fields(token, contact_id, custom_fields, extra=extra)
 
     # Post a structured note to the contact record
     await ghl.create_note(token, contact_id, _build_note(payload))

@@ -21,9 +21,29 @@ create table if not exists location_config (
   field_active_deps_id         text,
   field_coverage_amount_id     text,
   field_product_type_id        text,
+  field_budget_id              text,
+  field_urgency_id             text,
+  field_occupation_id          text,
+  field_height_id              text,
+  field_weight_id              text,
+  field_medications_id         text,
+  field_existing_coverage_id   text,
+  field_prior_outcome_id       text,
+  field_underwriting_notes_id  text,
   setup_complete               boolean not null default false,
   setup_at                     timestamptz
 );
+
+-- Migration: add new field columns to existing location_config tables
+alter table location_config add column if not exists field_budget_id             text;
+alter table location_config add column if not exists field_urgency_id            text;
+alter table location_config add column if not exists field_occupation_id         text;
+alter table location_config add column if not exists field_height_id             text;
+alter table location_config add column if not exists field_weight_id             text;
+alter table location_config add column if not exists field_medications_id        text;
+alter table location_config add column if not exists field_existing_coverage_id  text;
+alter table location_config add column if not exists field_prior_outcome_id      text;
+alter table location_config add column if not exists field_underwriting_notes_id text;
 
 -- Lightweight qualification history for the sidebar home screen
 create table if not exists qualifications (

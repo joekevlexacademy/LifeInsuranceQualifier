@@ -63,13 +63,18 @@ async def create_contact(access_token: str, location_id: str, data: dict) -> dic
 
 
 async def update_contact_fields(
-    access_token: str, contact_id: str, custom_fields: list
+    access_token: str, contact_id: str, custom_fields: list, extra: dict | None = None
 ) -> dict:
+    body: dict = {}
+    if custom_fields:
+        body["customFields"] = custom_fields
+    if extra:
+        body.update(extra)
     async with httpx.AsyncClient() as client:
         r = await client.put(
             f"{GHL_BASE}/contacts/{contact_id}",
             headers=_headers(access_token),
-            json={"customFields": custom_fields},
+            json=body,
         )
         _check(r, "update contact")
         return r.json().get("contact", {})

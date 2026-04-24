@@ -97,7 +97,7 @@
     <h2>Set up in 60 seconds</h2>
     <p class="sub">Connect your GoHighLevel sub-account and configure everything automatically.</p>
     <ul class="checklist">
-      <li><span class="check-icon">✓</span> Creates all 5 qualification contact fields</li>
+      <li><span class="check-icon">✓</span> Creates all 14 qualification contact fields</li>
       <li><span class="check-icon">✓</span> Adds a sidebar menu link for quick access</li>
       <li><span class="check-icon">✓</span> No manual steps required</li>
     </ul>
@@ -164,6 +164,15 @@
       <li id="step-f3"><span class="check-icon" id="ic-f3">·</span> Creating LIQ Active Dependencies field</li>
       <li id="step-f4"><span class="check-icon" id="ic-f4">·</span> Creating LIQ Coverage Amount field</li>
       <li id="step-f5"><span class="check-icon" id="ic-f5">·</span> Creating LIQ Product Type field</li>
+      <li id="step-f6"><span class="check-icon" id="ic-f6">·</span> Creating LIQ Budget field</li>
+      <li id="step-f7"><span class="check-icon" id="ic-f7">·</span> Creating LIQ Urgency field</li>
+      <li id="step-f8"><span class="check-icon" id="ic-f8">·</span> Creating LIQ Occupation field</li>
+      <li id="step-f9"><span class="check-icon" id="ic-f9">·</span> Creating LIQ Height field</li>
+      <li id="step-f10"><span class="check-icon" id="ic-f10">·</span> Creating LIQ Weight field</li>
+      <li id="step-f11"><span class="check-icon" id="ic-f11">·</span> Creating LIQ Medications field</li>
+      <li id="step-f12"><span class="check-icon" id="ic-f12">·</span> Creating LIQ Existing Coverage field</li>
+      <li id="step-f13"><span class="check-icon" id="ic-f13">·</span> Creating LIQ Prior Outcome field</li>
+      <li id="step-f14"><span class="check-icon" id="ic-f14">·</span> Creating LIQ Underwriting Notes field</li>
       <li id="step-menu"><span class="check-icon" id="ic-menu">·</span> Adding sidebar menu link</li>
       <li id="step-save"><span class="check-icon" id="ic-save">·</span> Saving configuration</li>
     </ul>
@@ -220,21 +229,21 @@
   }
 
   async function animateAndFinish(result, effectiveLocationId) {
-    // steps[0..4] = 5 custom fields
-    const fieldIcons = ['ic-f1','ic-f2','ic-f3','ic-f4','ic-f5'];
+    // steps[0..13] = 14 custom fields
+    const fieldIcons = ['ic-f1','ic-f2','ic-f3','ic-f4','ic-f5','ic-f6','ic-f7','ic-f8','ic-f9','ic-f10','ic-f11','ic-f12','ic-f13','ic-f14'];
     const fallback = result.success ? 'ok' : 'err';
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 14; i++) {
       if (i > 0) markIcon(fieldIcons[i], 'spin');
-      await new Promise(r => setTimeout(r, 350));
+      await new Promise(r => setTimeout(r, 180));
       const s = result.steps[i];
       markIcon(fieldIcons[i], s ? (s.ok ? 'ok' : 'err') : fallback);
     }
-    // steps[5] = sidebar menu link
+    // steps[14] = sidebar menu link
     markIcon('ic-menu', 'spin');
     await new Promise(r => setTimeout(r, 350));
-    const menuStep = result.steps[5];
+    const menuStep = result.steps[14];
     markIcon('ic-menu', menuStep ? (menuStep.ok ? 'ok' : 'err') : fallback);
-    // steps[6] = config save
+    // steps[15] = config save
     markIcon('ic-save', 'spin');
     await new Promise(r => setTimeout(r, 300));
     markIcon('ic-save', result.success ? 'ok' : 'err');
