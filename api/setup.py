@@ -81,6 +81,11 @@ FIELDS = [
         "data_type": "LARGE_TEXT",
         "config_key": "field_underwriting_notes_id",
     },
+    {
+        "name": "LIQ Qualification Summary",
+        "data_type": "LARGE_TEXT",
+        "config_key": "field_qual_summary_id",
+    },
 ]
 
 MENU_NAME = "Life Insurance Qualifier"
@@ -125,10 +130,10 @@ async def run(
         except Exception as exc:
             steps.append({"label": f"{label} field failed: {exc}", "ok": False})
 
-    # steps[0..13] = the 14 fields. Compute all_ok before adding further steps.
+    # steps[0..14] = the 15 fields. Compute all_ok before adding further steps.
     all_ok = all(s["ok"] for s in steps)
 
-    # steps[14] — sidebar menu link (non-blocking: failure won't prevent config save)
+    # steps[15] — sidebar menu link (non-blocking: failure won't prevent config save)
     menu_token = agency_token or access_token
     menu_cid = company_id or location_id
     menu_url: str = ""
@@ -155,7 +160,7 @@ async def run(
     except Exception as exc:
         steps.append({"label": f"Sidebar menu link failed: {exc} [url={menu_url!r}]", "ok": False})
 
-    # steps[15] — config save
+    # steps[16] — config save
     if all_ok:
         config["setup_complete"] = True
         config["setup_at"] = datetime.now(timezone.utc).isoformat()

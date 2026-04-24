@@ -251,9 +251,12 @@ async def recent_qualifications(location_id: str = Query(...)):
 
 @app.post("/api/submit")
 async def submit_qualification(payload: QualificationSubmission):
-    token = await auth.get_valid_token(payload.location_id)
-    cfg = app_config.get_config(payload.location_id)
+    try:
+        token = await auth.get_valid_token(payload.location_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Token lookup failed: {exc}")
 
+    cfg = app_config.get_config(payload.location_id)
     if not cfg:
         raise HTTPException(status_code=400, detail="Location not configured. Run setup first.")
 
@@ -261,21 +264,32 @@ async def submit_qualification(payload: QualificationSubmission):
     contact_id = payload.contact_id
     if not contact_id:
         name_parts = (payload.full_name or "New Contact").split(" ", 1)
-        contact = await ghl.create_contact(
-            token,
-            payload.location_id,
-            {
-                "firstName": name_parts[0],
-                "lastName": name_parts[1] if len(name_parts) > 1 else "",
-                "email": payload.email or "",
-                "phone": payload.phone or "",
-            },
-        )
+        try:
+            contact = await ghl.create_contact(
+                token,
+                payload.location_id,
+                {
+                    "firstName": name_parts[0],
+                    "lastName": name_parts[1] if len(name_parts) > 1 else "",
+                    "email": payload.email or "",
+                    "phone": payload.phone or "",
+                },
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to create GHL contact: {exc}")
         contact_id = contact["id"]
+
+    # Map triage_state computed value to GHL SINGLE_OPTIONS labels
+    _triage_labels = {
+        "clean": "Clean",
+        "follow_up": "Follow-up Required",
+        "elevated": "Elevated Attention",
+    }
+    triage_label = _triage_labels.get(payload.triage_state or "", payload.triage_state)
 
     # Write custom field values back to the GHL contact
     field_map = {
-        "field_triage_state_id": payload.triage_state,
+        "field_triage_state_id": triage_label,
         "field_product_direction_id": payload.product_direction,
         "field_active_deps_id": payload.active_dependencies,
         "field_coverage_amount_id": payload.coverage_amount,
@@ -289,6 +303,7 @@ async def submit_qualification(payload: QualificationSubmission):
         "field_existing_coverage_id": payload.existing_coverage,
         "field_prior_outcome_id": payload.prior_outcome,
         "field_underwriting_notes_id": payload.underwriting_notes,
+        "field_qual_summary_id": _build_summary(payload, triage_label),
     }
     custom_fields = [
         {"id": cfg[cfg_key], "value": value}
@@ -306,27 +321,67 @@ async def submit_qualification(payload: QualificationSubmission):
         if ghl_gender:
             extra["gender"] = ghl_gender
 
-    if custom_fields or extra:
-        await ghl.update_contact_fields(token, contact_id, custom_fields, extra=extra)
+    try:
+        if custom_fields or extra:
+            await ghl.update_contact_fields(token, contact_id, custom_fields, extra=extra)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to update GHL contact fields: {exc}")
 
     # Post a structured note to the contact record
-    await ghl.create_note(token, contact_id, _build_note(payload))
+    try:
+        await ghl.create_note(token, contact_id, _build_note(payload))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to create GHL note: {exc}")
 
     # Record in Supabase for the recent-qualifications list
-    _sb().table("qualifications").insert(
-        {
-            "location_id": payload.location_id,
-            "contact_id": contact_id,
-            "contact_name": payload.full_name or "Unknown",
-            "triage_state": payload.triage_state,
-            "qualified_at": datetime.now(timezone.utc).isoformat(),
-        }
-    ).execute()
+    try:
+        _sb().table("qualifications").insert(
+            {
+                "location_id": payload.location_id,
+                "contact_id": contact_id,
+                "contact_name": payload.full_name or "Unknown",
+                "triage_state": payload.triage_state,
+                "qualified_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ).execute()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to save qualification record: {exc}")
 
     return {"ok": True, "contact_id": contact_id}
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
+def _build_summary(p: QualificationSubmission, triage_label: str) -> str:
+    deps = p.active_dependencies or "None"
+    lines = [
+        f"Triage: {triage_label}",
+        f"Active Flags: {deps}",
+        "",
+        f"Product Direction: {p.product_direction or '—'}",
+        "",
+        "Coverage Goals:",
+        f"  Type: {p.product_type or '—'}",
+        f"  Amount: {p.coverage_amount or '—'}",
+        f"  Budget: {p.budget or '—'}",
+        f"  Urgency: {p.urgency or '—'}",
+    ]
+    notes = []
+    if p.pending_tests == "yes":
+        notes.append("Pending tests / open work-up — hold on quoting")
+    if p.hospital_recent == "yes":
+        notes.append("Recent hospitalization — clarify dates and recovery status")
+    if p.underwriting_history == "yes":
+        notes.append("Prior underwriting friction — review before quoting")
+    if p.cardiac_history:
+        notes.append("Cardiac history marked — cardiology questions recommended")
+    if notes:
+        lines.append("")
+        lines.append("Advisor Notes:")
+        for note in notes:
+            lines.append(f"  • {note}")
+    return "\n".join(lines)
+
 
 def _build_note(p: QualificationSubmission) -> str:
     deps = p.active_dependencies or "None"

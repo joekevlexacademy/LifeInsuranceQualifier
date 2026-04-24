@@ -30,6 +30,7 @@ create table if not exists location_config (
   field_existing_coverage_id   text,
   field_prior_outcome_id       text,
   field_underwriting_notes_id  text,
+  field_qual_summary_id        text,
   setup_complete               boolean not null default false,
   setup_at                     timestamptz
 );
@@ -44,6 +45,7 @@ alter table location_config add column if not exists field_medications_id       
 alter table location_config add column if not exists field_existing_coverage_id  text;
 alter table location_config add column if not exists field_prior_outcome_id      text;
 alter table location_config add column if not exists field_underwriting_notes_id text;
+alter table location_config add column if not exists field_qual_summary_id       text;
 
 -- Lightweight qualification history for the sidebar home screen
 create table if not exists qualifications (
