@@ -397,6 +397,7 @@
   const locationId = urlParams.get('location_id') || '';
   const contactId  = urlParams.get('contact_id') || '';
   const isNew = !contactId;
+  let loadedContactName = null;
 
   // Back button
   document.getElementById('backBtn').href = `/?location_id=${locationId}`;
@@ -416,6 +417,7 @@
       .then(r => r.json())
       .then(c => {
         const name = [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Contact';
+        loadedContactName = name;
         document.getElementById('contactName').textContent = name;
         document.getElementById('contactAvatar').textContent = name.charAt(0).toUpperCase();
         document.getElementById('contactMeta').textContent = [c.email, c.phone].filter(Boolean).join(' · ') || 'No contact details on file';
@@ -562,7 +564,7 @@
     const payload = {
       location_id: locationId,
       contact_id: contactId || null,
-      full_name: isNew ? `${firstName} ${lastName}`.trim() : null,
+      full_name: isNew ? `${firstName} ${lastName}`.trim() : loadedContactName,
       email: document.getElementById('nc_email')?.value.trim() || null,
       phone: document.getElementById('nc_phone')?.value.trim() || null,
       state: document.getElementById('state').value.trim() || null,
