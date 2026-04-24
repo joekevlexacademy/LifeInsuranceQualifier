@@ -109,12 +109,27 @@
   <!-- Screen 1b: Location picker (company-level installs) -->
   <div class="screen" id="s_pick">
     <h2>Choose sub-account</h2>
-    <p class="sub">This app was installed at the agency level. Select the sub-account you want to configure, then click <strong>Connect</strong> to authorize direct access to it.</p>
+    <p class="sub">Select the sub-account to configure.</p>
     <select id="locationSelect" style="width:100%;padding:12px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:12px;color:#eef2ff;font:inherit;font-size:0.95rem;margin-bottom:24px;cursor:pointer;">
     </select>
-    <button class="btn btn-primary" id="pickBtn">Connect to Sub-Account →</button>
-    <p style="color:#9fb0d9;font-size:0.82rem;margin-top:12px;text-align:center;">You'll be taken to GoHighLevel to confirm access, then setup completes automatically.</p>
+    <button class="btn btn-primary" id="pickBtn">Next →</button>
     <div class="error-msg" id="pickError"></div>
+  </div>
+
+  <!-- Screen 1c: Private Integration key (company-level installs) -->
+  <div class="screen" id="s_key">
+    <h2>API key required</h2>
+    <p class="sub">To create custom fields in <strong id="pickedName"></strong>, enter a Private Integration key for that sub-account.</p>
+    <div class="note">
+      <strong>How to get it:</strong><br>
+      In GHL, switch to the sub-account → <strong>Settings → Private Integrations</strong> → create a new key (or copy an existing one) → paste below.
+    </div>
+    <input type="password" id="apiKeyInput"
+      placeholder="Paste Private Integration key…"
+      style="width:100%;padding:12px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:12px;color:#eef2ff;font:inherit;font-size:0.95rem;margin-bottom:16px;outline:none;"
+    />
+    <button class="btn btn-primary" id="apiKeyBtn">Complete Setup →</button>
+    <div class="error-msg" id="apiKeyError"></div>
   </div>
 
   <!-- Screen 2: Auto-setup running -->
@@ -166,61 +181,22 @@
     el.textContent = state === 'ok' ? '✓' : state === 'err' ? '✕' : state === 'spin' ? '↻' : '·';
   }
 
+  let _companyId = null;
+  let _pickedLocationId = null;
+
   function showLocationPicker(locations) {
     const select = document.getElementById('locationSelect');
-    select.innerHTML = locations
-      .map(l => `<option value="${l.id}">${l.name}</option>`)
-      .join('');
+    select.innerHTML = locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
     show('s_pick');
-    // Clicking Connect redirects to OAuth so we get a location-level token
     document.getElementById('pickBtn').onclick = () => {
-      window.location.href = '/oauth/start';
+      _pickedLocationId = select.value;
+      const pickedName = locations.find(l => l.id === _pickedLocationId)?.name || _pickedLocationId;
+      document.getElementById('pickedName').textContent = pickedName;
+      show('s_key');
     };
   }
 
-  async function runSetup() {
-    show('s2');
-
-    // Try to get location name; if it fails, this might be a company-level install
-    try {
-      const locRes = await fetch(`/api/location?location_id=${locationId}`);
-      if (locRes.ok) {
-        const locData = await locRes.json();
-        document.getElementById('locationLabel').textContent = `Configuring ${locData.name || 'your sub-account'}…`;
-      } else {
-        // Company-level install: fetch location list and show picker
-        const locsRes = await fetch(`/api/setup/locations?location_id=${locationId}`);
-        if (locsRes.ok) {
-          const locsData = await locsRes.json();
-          if (locsData.locations?.length > 0) {
-            showLocationPicker(locsData.locations);
-            return; // Stop here — OAuth redirect will bring us back with a location token
-          }
-        }
-      }
-    } catch (_) {}
-
-    // Run setup with the location token we have
-    markIcon('ic-f1', 'spin');
-    let result;
-    try {
-      const res = await fetch(`/api/setup/run?location_id=${locationId}`);
-      const text = await res.text();
-      try {
-        result = JSON.parse(text);
-      } catch (_) {
-        throw new Error(`Server error (HTTP ${res.status}): ${text.slice(0, 300)}`);
-      }
-      if (!res.ok && !result.steps) {
-        throw new Error(result.detail || `HTTP ${res.status}`);
-      }
-    } catch (e) {
-      document.getElementById('setupError').style.display = 'block';
-      document.getElementById('setupError').textContent = e.message;
-      return;
-    }
-
-    // Animate each icon in sequence
+  async function animateAndFinish(result, effectiveLocationId) {
     const fieldIcons = ['ic-f1','ic-f2','ic-f3','ic-f4','ic-f5'];
     const fieldSteps = result.steps.slice(0, 5);
     for (let i = 0; i < fieldSteps.length; i++) {
@@ -228,8 +204,6 @@
       await new Promise(r => setTimeout(r, 350));
       markIcon(fieldIcons[i], fieldSteps[i].ok ? 'ok' : 'err');
     }
-
-    // Save step
     markIcon('ic-save', 'spin');
     await new Promise(r => setTimeout(r, 300));
     markIcon('ic-save', result.success ? 'ok' : 'err');
@@ -237,14 +211,80 @@
     if (result.success) {
       await new Promise(r => setTimeout(r, 600));
       document.getElementById('openAppBtn').onclick = () => {
-        window.location.href = `/?location_id=${locationId}`;
+        window.location.href = `/?location_id=${effectiveLocationId}`;
       };
       show('s3');
     } else {
       const errEl = document.getElementById('setupError');
       errEl.style.display = 'block';
-      const failed = result.steps.filter(s => !s.ok).map(s => s.label).join('; ');
-      errEl.textContent = `Setup failed: ${failed}`;
+      errEl.textContent = `Setup failed: ${result.steps.filter(s => !s.ok).map(s => s.label).join('; ')}`;
+    }
+  }
+
+  async function callSetup(url, options = {}) {
+    const res = await fetch(url, options);
+    const text = await res.text();
+    let result;
+    try { result = JSON.parse(text); } catch (_) {
+      throw new Error(`Server error (HTTP ${res.status}): ${text.slice(0, 300)}`);
+    }
+    if (!res.ok && !result.steps) throw new Error(result.detail || `HTTP ${res.status}`);
+    return result;
+  }
+
+  document.getElementById('apiKeyBtn').onclick = async () => {
+    const apiKey = document.getElementById('apiKeyInput').value.trim();
+    const errEl = document.getElementById('apiKeyError');
+    errEl.style.display = 'none';
+    if (!apiKey) { errEl.textContent = 'Please paste your Private Integration key.'; errEl.style.display = 'block'; return; }
+
+    show('s2');
+    markIcon('ic-f1', 'spin');
+    document.getElementById('locationLabel').textContent = `Configuring ${document.getElementById('pickedName').textContent}…`;
+    try {
+      const params = new URLSearchParams({ location_id: _pickedLocationId, company_id: _companyId });
+      const result = await callSetup(`/api/setup/run?${params}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: apiKey }),
+      });
+      await animateAndFinish(result, _pickedLocationId);
+    } catch (e) {
+      document.getElementById('setupError').style.display = 'block';
+      document.getElementById('setupError').textContent = e.message;
+    }
+  };
+
+  async function runSetup() {
+    show('s2');
+
+    // Detect company vs location install
+    try {
+      const locRes = await fetch(`/api/location?location_id=${locationId}`);
+      if (locRes.ok) {
+        const locData = await locRes.json();
+        document.getElementById('locationLabel').textContent = `Configuring ${locData.name || 'your sub-account'}…`;
+      } else {
+        const locsRes = await fetch(`/api/setup/locations?location_id=${locationId}`);
+        if (locsRes.ok) {
+          const locsData = await locsRes.json();
+          if (locsData.locations?.length > 0) {
+            _companyId = locationId;
+            showLocationPicker(locsData.locations);
+            return;
+          }
+        }
+      }
+    } catch (_) {}
+
+    // Normal location-level install — run setup directly
+    markIcon('ic-f1', 'spin');
+    try {
+      const result = await callSetup(`/api/setup/run?location_id=${locationId}`);
+      await animateAndFinish(result, locationId);
+    } catch (e) {
+      document.getElementById('setupError').style.display = 'block';
+      document.getElementById('setupError').textContent = e.message;
     }
   }
 

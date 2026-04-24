@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from supabase import create_client
 
@@ -96,7 +96,6 @@ async def run_setup(location_id: str = Query(...), company_id: str = Query(None)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Token lookup failed: {exc}")
 
-    # Company-level install: copy token row to the real location so FK constraint holds
     if company_id and company_id != location_id:
         try:
             await auth.ensure_location_installation(company_id, location_id)
@@ -104,6 +103,20 @@ async def run_setup(location_id: str = Query(...), company_id: str = Query(None)
             raise HTTPException(status_code=500, detail=f"Failed to register location: {exc}")
 
     return await app_setup.run(location_id, token)
+
+
+@app.post("/api/setup/run")
+async def run_setup_with_key(
+    location_id: str = Query(...),
+    company_id: str = Query(None),
+    api_key: str = Body(..., embed=True),
+):
+    """Setup using a GHL Private Integration key (for agency-level installs)."""
+    try:
+        await auth.save_api_key_installation(company_id or location_id, location_id, api_key)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to save API key: {exc}")
+    return await app_setup.run(location_id, api_key)
 
 
 # ── App API ────────────────────────────────────────────────────────────────────

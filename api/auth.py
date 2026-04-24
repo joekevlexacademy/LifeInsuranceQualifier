@@ -87,6 +87,20 @@ async def _refresh(location_id: str) -> str:
     return data["access_token"]
 
 
+async def save_api_key_installation(company_id: str, location_id: str, api_key: str) -> None:
+    """Store a GHL Private Integration key as the location's access credential."""
+    sb = _sb()
+    far_future = (datetime.now(timezone.utc) + timedelta(days=36500)).isoformat()
+    sb.table("installations").upsert({
+        "location_id": location_id,
+        "agency_id": company_id,
+        "access_token": api_key,
+        "refresh_token": "",
+        "expires_at": far_future,
+        "uninstalled_at": None,
+    }).execute()
+
+
 async def get_valid_token(location_id: str) -> str:
     sb = _sb()
 
@@ -96,22 +110,26 @@ async def get_valid_token(location_id: str) -> str:
     # Try direct location match first
     record = _first(
         sb.table("installations")
-        .select("access_token, expires_at, location_id")
+        .select("access_token, expires_at, location_id, refresh_token")
         .eq("location_id", location_id)
         .execute()
     )
 
-    # Fall back to company-level install (agency token covers all sub-accounts)
+    # Fall back to company-level install
     if not record:
         record = _first(
             sb.table("installations")
-            .select("access_token, expires_at, location_id")
+            .select("access_token, expires_at, location_id, refresh_token")
             .eq("agency_id", location_id)
             .execute()
         )
 
     if not record:
         raise ValueError(f"No installation found for location_id: {location_id}")
+
+    # Private Integration keys have no refresh_token — they don't expire
+    if not record.get("refresh_token"):
+        return record["access_token"]
 
     resolved_id = record["location_id"]
     expires_at = datetime.fromisoformat(record["expires_at"])
