@@ -88,7 +88,7 @@ async def run(
         if any((m.get("title") or m.get("name")) == MENU_NAME for m in existing_menus):
             steps.append({"label": "Sidebar menu link found", "ok": True})
         else:
-            menu_url = os.environ["APP_BASE_URL"] + "/?location_id={{location.id}}"
+            menu_url = os.environ["APP_BASE_URL"] + "/?location_id={location.id}"
             await ghl.create_custom_menu(
                 access_token=menu_token,
                 company_id=menu_cid,

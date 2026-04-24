@@ -95,7 +95,7 @@ async def debug_menu(location_id: str = Query(...)):
         return result
 
     try:
-        menu_url = os.environ["APP_BASE_URL"] + "/?location_id={{location.id}}"
+        menu_url = os.environ["APP_BASE_URL"] + "/?location_id={location.id}"
         created = await ghl.create_custom_menu(
             access_token=token,
             company_id=location_id,

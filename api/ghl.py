@@ -124,7 +124,7 @@ async def create_custom_menu(
         "showOnCompany": True,
         "showOnLocation": True,
         "showToAllLocations": True,
-        "openMode": "newTab",
+        "openMode": "new_tab",
         "locations": [],
         "userRole": "all",
     }
