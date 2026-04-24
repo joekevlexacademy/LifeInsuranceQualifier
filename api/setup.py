@@ -139,16 +139,30 @@ async def run(
     menu_url: str = ""
     try:
         existing_menus = await ghl.list_custom_menus(menu_token, menu_cid)
-        if any(
-            (m.get("title") or m.get("name")) == MENU_NAME and location_id in m.get("url", "")
-            for m in existing_menus
-        ):
+        base = os.environ["APP_BASE_URL"].rstrip("/")
+        if not base.startswith("http"):
+            base = "https://" + base
+        menu_url = f"{base}/?location_id={location_id}"
+
+        existing = next(
+            (m for m in existing_menus
+             if (m.get("title") or m.get("name")) == MENU_NAME and location_id in m.get("url", "")),
+            None,
+        )
+        if existing and existing.get("openMode") == "iframe":
             steps.append({"label": "Sidebar menu link found", "ok": True})
+        elif existing:
+            # Already exists but was created with new_tab — upgrade to iframe
+            menu_id = existing.get("id") or existing.get("_id")
+            await ghl.update_custom_menu(
+                access_token=menu_token,
+                menu_id=menu_id,
+                name=MENU_NAME,
+                url=menu_url,
+                location_id=location_id,
+            )
+            steps.append({"label": "Sidebar menu link updated to embedded mode", "ok": True})
         else:
-            base = os.environ["APP_BASE_URL"].rstrip("/")
-            if not base.startswith("http"):
-                base = "https://" + base
-            menu_url = f"{base}/?location_id={location_id}"
             await ghl.create_custom_menu(
                 access_token=menu_token,
                 company_id=menu_cid,
