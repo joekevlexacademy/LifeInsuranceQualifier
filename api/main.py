@@ -314,24 +314,39 @@ async def submit_qualification(payload: QualificationSubmission):
     }
     triage_label = _triage_labels.get(payload.triage_state or "", payload.triage_state)
 
-    # Write custom field values back to the GHL contact
-    field_map = {
-        "field_triage_state_id": triage_label,
-        "field_product_direction_id": payload.product_direction,
-        "field_active_deps_id": payload.active_dependencies,
+    # Computed fields (triage state, product direction, active deps, summary) are
+    # derived from the triage section which cannot be pre-filled on re-open.
+    # Only overwrite them if the agent actually engaged with the triage section
+    # this session — otherwise the existing GHL values are left untouched.
+    triage_engaged = bool(
+        payload.pending_tests or payload.hospital_recent
+        or payload.underwriting_history or payload.dui_history
+        or payload.sleep_apnea or payload.cpap or payload.diabetes_meds
+        or payload.psych_meds or payload.inhaler or payload.cardiac_history
+    )
+
+    # Explicit fields: only sent when the form field has a value (guard below).
+    # Computed fields: only sent when triage was engaged this session.
+    field_map: dict = {
         "field_coverage_amount_id": payload.coverage_amount,
-        "field_product_type_id": payload.product_type,
-        "field_budget_id": payload.budget,
-        "field_urgency_id": payload.urgency,
-        "field_occupation_id": payload.occupation,
-        "field_height_id": payload.height,
-        "field_weight_id": payload.weight,
-        "field_medications_id": payload.med_list,
-        "field_existing_coverage_id": payload.existing_coverage,
-        "field_prior_outcome_id": payload.prior_outcome,
+        "field_product_type_id":    payload.product_type,
+        "field_budget_id":          payload.budget,
+        "field_urgency_id":         payload.urgency,
+        "field_occupation_id":      payload.occupation,
+        "field_height_id":          payload.height,
+        "field_weight_id":          payload.weight,
+        "field_medications_id":     payload.med_list,
+        "field_existing_coverage_id":  payload.existing_coverage,
+        "field_prior_outcome_id":      payload.prior_outcome,
         "field_underwriting_notes_id": payload.underwriting_notes,
-        "field_qual_summary_id": _build_summary(payload, triage_label),
     }
+    if triage_engaged:
+        field_map.update({
+            "field_triage_state_id":    triage_label,
+            "field_product_direction_id": payload.product_direction,
+            "field_active_deps_id":     payload.active_dependencies,
+            "field_qual_summary_id":    _build_summary(payload, triage_label),
+        })
     custom_fields = [
         {"id": cfg[cfg_key], "value": value}
         for cfg_key, value in field_map.items()
