@@ -115,17 +115,18 @@ async def create_custom_menu(
     company_id: str,
     name: str,
     url: str,
+    location_id: Optional[str] = None,
 ) -> dict:
-    """Create a sidebar custom menu link visible to all locations under the agency."""
+    """Create a sidebar custom menu link scoped to a specific location (or all if location_id is None)."""
     payload = {
         "title": name,
         "url": url,
         "icon": {"name": "shield-alt", "fontFamily": "fas"},
-        "showOnCompany": True,
+        "showOnCompany": False,
         "showOnLocation": True,
-        "showToAllLocations": True,
+        "showToAllLocations": location_id is None,
         "openMode": "new_tab",
-        "locations": [],
+        "locations": [location_id] if location_id else [],
         "userRole": "all",
     }
     async with httpx.AsyncClient() as client:
