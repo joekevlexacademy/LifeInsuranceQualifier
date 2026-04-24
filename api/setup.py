@@ -8,12 +8,8 @@ from . import ghl
 FIELDS = [
     {
         "name": "LIQ Triage State",
-        "data_type": "DROPDOWN",
-        "options": [
-            {"label": "Clean", "value": "clean"},
-            {"label": "Follow-up Required", "value": "follow_up"},
-            {"label": "Elevated Attention", "value": "elevated"},
-        ],
+        "data_type": "SINGLE_OPTIONS",
+        "options": ["Clean", "Follow-up Required", "Elevated Attention"],
         "config_key": "field_triage_state_id",
     },
     {
