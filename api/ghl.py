@@ -13,13 +13,20 @@ def _headers(access_token: str) -> dict:
     }
 
 
+def _check(r: httpx.Response, operation: str) -> None:
+    """Raise with the real GHL response body so errors are debuggable."""
+    if r.status_code >= 400:
+        body = r.text[:500] if r.text else "<empty>"
+        raise Exception(f"GHL {operation} failed (HTTP {r.status_code}): {body}")
+
+
 async def get_location(access_token: str, location_id: str) -> dict:
     async with httpx.AsyncClient() as client:
         r = await client.get(
             f"{GHL_BASE}/locations/{location_id}",
             headers=_headers(access_token),
         )
-        r.raise_for_status()
+        _check(r, "get location")
         return r.json().get("location", {})
 
 
@@ -29,7 +36,7 @@ async def get_contact(access_token: str, contact_id: str) -> dict:
             f"{GHL_BASE}/contacts/{contact_id}",
             headers=_headers(access_token),
         )
-        r.raise_for_status()
+        _check(r, "get contact")
         return r.json().get("contact", {})
 
 
@@ -40,7 +47,7 @@ async def search_contacts(access_token: str, location_id: str, query: str) -> li
             headers=_headers(access_token),
             params={"locationId": location_id, "query": query, "limit": 10},
         )
-        r.raise_for_status()
+        _check(r, "search contacts")
         return r.json().get("contacts", [])
 
 
@@ -51,7 +58,7 @@ async def create_contact(access_token: str, location_id: str, data: dict) -> dic
             headers=_headers(access_token),
             json={"locationId": location_id, **data},
         )
-        r.raise_for_status()
+        _check(r, "create contact")
         return r.json().get("contact", {})
 
 
@@ -64,7 +71,7 @@ async def update_contact_fields(
             headers=_headers(access_token),
             json={"customFields": custom_fields},
         )
-        r.raise_for_status()
+        _check(r, "update contact")
         return r.json().get("contact", {})
 
 
@@ -75,7 +82,7 @@ async def create_note(access_token: str, contact_id: str, body: str) -> dict:
             headers=_headers(access_token),
             json={"body": body},
         )
-        r.raise_for_status()
+        _check(r, "create note")
         return r.json()
 
 
@@ -86,18 +93,19 @@ async def list_locations(access_token: str, company_id: str) -> list:
             headers=_headers(access_token),
             params={"companyId": company_id, "limit": 100},
         )
-        r.raise_for_status()
+        _check(r, "list locations")
         return r.json().get("locations", [])
 
 
 async def list_custom_menus(access_token: str, company_id: str) -> list:
+    """List existing custom menu links. company_id is unused by GHL but kept for API symmetry."""
     async with httpx.AsyncClient() as client:
         r = await client.get(
             f"{GHL_BASE}/custom-menus/",
             headers=_headers(access_token),
-            params={"locationId": company_id},
+            params={"limit": 100},
         )
-        r.raise_for_status()
+        _check(r, "list custom menus")
         data = r.json()
         return data.get("customMenus") or data.get("menus") or []
 
@@ -108,18 +116,25 @@ async def create_custom_menu(
     name: str,
     url: str,
 ) -> dict:
+    """Create a sidebar custom menu link visible to all locations under the agency."""
+    payload = {
+        "title": name,
+        "url": url,
+        "icon": {"name": "shield-alt", "fontFamily": "fas"},
+        "showOnCompany": True,
+        "showOnLocation": True,
+        "showToAllLocations": True,
+        "openMode": "newTab",
+        "locations": [],
+        "userRole": "all",
+    }
     async with httpx.AsyncClient() as client:
         r = await client.post(
             f"{GHL_BASE}/custom-menus/",
             headers=_headers(access_token),
-            json={
-                "name": name,
-                "url": url,
-                "locationId": company_id,
-                "openMode": "NEW_TAB",
-            },
+            json=payload,
         )
-        r.raise_for_status()
+        _check(r, "create custom menu")
         return r.json()
 
 
@@ -129,7 +144,7 @@ async def list_custom_fields(access_token: str, location_id: str) -> list:
             f"{GHL_BASE}/locations/{location_id}/customFields",
             headers=_headers(access_token),
         )
-        r.raise_for_status()
+        _check(r, "list custom fields")
         return r.json().get("customFields", [])
 
 
@@ -149,5 +164,5 @@ async def create_custom_field(
             headers=_headers(access_token),
             json=payload,
         )
-        r.raise_for_status()
+        _check(r, "create custom field")
         return r.json().get("customField", {})
