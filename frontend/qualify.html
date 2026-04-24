@@ -118,6 +118,21 @@
     .primary { background: linear-gradient(135deg,#7aa2ff,#8ef0d0); color: #05101a; }
     .secondary { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid rgba(255,255,255,0.08); }
     .hidden { display: none !important; }
+    /* Overwrite confirmation modal */
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 999;
+      background: rgba(5, 10, 24, 0.72); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-box {
+      background: #131a2e; border: 1px solid rgba(255,212,138,0.35);
+      border-radius: 18px; padding: 32px 28px; width: 100%; max-width: 420px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+    }
+    .modal-box h3 { margin: 0 0 10px; font-size: 1.15rem; color: #ffe5b4; }
+    .modal-box p  { margin: 0 0 24px; color: #c8c0a8; font-size: 0.92rem; line-height: 1.6; }
+    .modal-actions { display: flex; gap: 10px; }
+    .modal-actions button { flex: 1; padding: 13px; font-size: 0.95rem; }
     /* Success screen */
     .success-screen {
       display: none; text-align: center; padding: 60px 32px;
@@ -357,13 +372,6 @@
         <button type="button" class="primary" id="submitBtn" onclick="submitForm()" disabled>Save qualification →</button>
         <button type="button" class="secondary" onclick="resetForm()">Reset form</button>
       </div>
-      <div id="overwriteAlert" class="hidden" style="margin-top:12px;background:rgba(255,212,138,0.09);border:1px solid rgba(255,212,138,0.35);border-radius:12px;padding:16px;">
-        <p style="margin:0 0 12px;font-size:0.9rem;color:#ffe5b4;line-height:1.55;">⚠ This contact already has a saved qualification on record. Saving will overwrite their previous qualifying data.</p>
-        <div style="display:flex;gap:10px;">
-          <button class="primary" type="button" style="flex:1;padding:11px;font-size:0.92rem;" onclick="proceedSave()">Yes, overwrite →</button>
-          <button class="secondary" type="button" style="flex:1;padding:11px;font-size:0.92rem;" onclick="cancelOverwrite()">Cancel</button>
-        </div>
-      </div>
       <div id="submitError" style="color:#ff9b9b;font-size:0.88rem;margin-top:12px;display:none;"></div>
     </main>
 
@@ -383,6 +391,18 @@
         <div class="summary-item"><strong>Likely follow-up</strong>Pending sections appear once triggered.</div>
       </div>
     </aside>
+  </div>
+</div>
+
+<!-- Overwrite confirmation modal -->
+<div class="modal-backdrop hidden" id="overwriteAlert">
+  <div class="modal-box">
+    <h3>⚠ Overwrite existing qualification?</h3>
+    <p>This contact already has a saved qualification on record. Saving will overwrite their previous qualifying data. This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="primary" type="button" onclick="proceedSave()">Yes, overwrite →</button>
+      <button class="secondary" type="button" onclick="cancelOverwrite()">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -620,9 +640,7 @@
   async function submitForm() {
     // Show overwrite warning if contact has prior LIQ data and this isn't a confirmed proceed
     if (!_pendingSave && !isNew && hasExistingLiqData) {
-      const alert = document.getElementById('overwriteAlert');
-      alert.classList.remove('hidden');
-      alert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      document.getElementById('overwriteAlert').classList.remove('hidden');
       return;
     }
     _pendingSave = false;
