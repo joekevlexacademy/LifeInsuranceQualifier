@@ -620,7 +620,9 @@
   async function submitForm() {
     // Show overwrite warning if contact has prior LIQ data and this isn't a confirmed proceed
     if (!_pendingSave && !isNew && hasExistingLiqData) {
-      document.getElementById('overwriteAlert').classList.remove('hidden');
+      const alert = document.getElementById('overwriteAlert');
+      alert.classList.remove('hidden');
+      alert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       return;
     }
     _pendingSave = false;
