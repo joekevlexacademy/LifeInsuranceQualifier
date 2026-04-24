@@ -36,7 +36,7 @@ async def get_contact(access_token: str, contact_id: str) -> dict:
 async def search_contacts(access_token: str, location_id: str, query: str) -> list:
     async with httpx.AsyncClient() as client:
         r = await client.get(
-            f"{GHL_BASE}/contacts/search",
+            f"{GHL_BASE}/contacts/",
             headers=_headers(access_token),
             params={"locationId": location_id, "query": query, "limit": 10},
         )

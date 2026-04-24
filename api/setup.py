@@ -37,16 +37,19 @@ FIELDS = [
 ]
 
 
-async def _get_or_create_group(access_token: str, location_id: str) -> str | None:
+async def _get_or_create_group(access_token: str, location_id: str) -> tuple:
     try:
         groups = await ghl.list_custom_field_groups(access_token, location_id)
         for g in groups:
             if g.get("name") == GROUP_NAME:
-                return g["id"]
+                return g["id"], None
         result = await ghl.create_custom_field_group(access_token, location_id, GROUP_NAME)
-        return result.get("id")
-    except Exception:
-        return None
+        gid = result.get("id")
+        if not gid:
+            return None, f"API returned no id: {result}"
+        return gid, None
+    except Exception as exc:
+        return None, str(exc)
 
 
 async def run(location_id: str, access_token: str) -> dict:
@@ -64,7 +67,11 @@ async def run(location_id: str, access_token: str) -> dict:
             "success": False,
         }
 
-    group_id = await _get_or_create_group(access_token, location_id)
+    group_id, group_err = await _get_or_create_group(access_token, location_id)
+    if group_id:
+        steps.append({"label": f'Field group "{GROUP_NAME}" ready', "ok": True})
+    else:
+        steps.append({"label": f"Field group skipped: {group_err}", "ok": True})
 
     for field_def in FIELDS:
         label = field_def["name"]
