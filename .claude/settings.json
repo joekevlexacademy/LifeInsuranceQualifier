@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m ' *)",
+      "WebFetch(domain:www.ghlapiv2.com)",
+      "Bash(cd /tmp)",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "git.autofetch": false,
+  "git.commandTimeout": 15000,
+  "git.detectSubmodules": false,
+  "git.detectSubmodulesLimit": 0
+}

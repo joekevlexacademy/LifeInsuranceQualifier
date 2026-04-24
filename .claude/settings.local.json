@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "WebFetch(domain:highlevel.stoplight.io)",
+      "WebFetch(domain:services.leadconnectorhq.com)",
+      "WebFetch(domain:public-api.gohighlevel.com)",
+      "WebSearch",
+      "WebFetch(domain:marketplace.gohighlevel.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:ideas.gohighlevel.com)",
+      "WebFetch(domain:help.gohighlevel.com)"
+    ]
+  }
+}
