@@ -354,8 +354,15 @@
       </form>
 
       <div class="toolbar">
-        <button type="button" class="primary" id="submitBtn" onclick="submitForm()">Save qualification →</button>
+        <button type="button" class="primary" id="submitBtn" onclick="submitForm()" disabled>Save qualification →</button>
         <button type="button" class="secondary" onclick="resetForm()">Reset form</button>
+      </div>
+      <div id="overwriteAlert" class="hidden" style="margin-top:12px;background:rgba(255,212,138,0.09);border:1px solid rgba(255,212,138,0.35);border-radius:12px;padding:16px;">
+        <p style="margin:0 0 12px;font-size:0.9rem;color:#ffe5b4;line-height:1.55;">⚠ This contact already has a saved qualification on record. Saving will overwrite their previous qualifying data.</p>
+        <div style="display:flex;gap:10px;">
+          <button class="primary" type="button" style="flex:1;padding:11px;font-size:0.92rem;" onclick="proceedSave()">Yes, overwrite →</button>
+          <button class="secondary" type="button" style="flex:1;padding:11px;font-size:0.92rem;" onclick="cancelOverwrite()">Cancel</button>
+        </div>
       </div>
       <div id="submitError" style="color:#ff9b9b;font-size:0.88rem;margin-top:12px;display:none;"></div>
     </main>
@@ -400,6 +407,32 @@
   const contactId  = urlParams.get('contact_id') || '';
   const isNew = !contactId;
   let loadedContactName = null;
+  let initialFormState = null;
+  let hasExistingLiqData = false;
+  let _pendingSave = false;
+
+  function serializeForm() {
+    const out = {};
+    document.querySelectorAll('#lifeForm input, #lifeForm select, #lifeForm textarea').forEach(el => {
+      out[el.id || el.name] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+    return JSON.stringify(out);
+  }
+
+  function updateSaveBtn() {
+    const changed = initialFormState === null || serializeForm() !== initialFormState;
+    document.getElementById('submitBtn').disabled = !changed;
+  }
+
+  function proceedSave() {
+    document.getElementById('overwriteAlert').classList.add('hidden');
+    _pendingSave = true;
+    submitForm();
+  }
+
+  function cancelOverwrite() {
+    document.getElementById('overwriteAlert').classList.add('hidden');
+  }
 
   // Back button
   document.getElementById('backBtn').href = `/?location_id=${locationId}`;
@@ -412,6 +445,7 @@
     document.getElementById('contactAvatar').textContent = '+';
     document.getElementById('contactName').textContent = 'New contact';
     document.getElementById('contactMeta').textContent = 'Will be created in GHL on submit';
+    // For new contacts baseline is set after initial render (all blank) — any typing enables Save
   } else {
     // Pre-fill from GHL
     document.getElementById('contactBar').classList.remove('hidden');
@@ -459,10 +493,16 @@
 
         updateSelectColors();
         renderState();
+        // Snapshot the prefilled state — Save stays disabled until something changes
+        initialFormState = serializeForm();
+        hasExistingLiqData = !!(liq.qual_summary);
+        updateSaveBtn();
       })
       .catch(() => {
         document.getElementById('contactName').textContent = 'Contact';
         document.getElementById('contactMeta').textContent = '';
+        initialFormState = serializeForm();
+        updateSaveBtn();
       });
   }
 
@@ -559,8 +599,8 @@
   }
 
   document.querySelectorAll('input,select,textarea').forEach(el => {
-    el.addEventListener('input', renderState);
-    el.addEventListener('change', renderState);
+    el.addEventListener('input', () => { renderState(); updateSaveBtn(); });
+    el.addEventListener('change', () => { renderState(); updateSaveBtn(); });
   });
   document.querySelectorAll('select').forEach(s => {
     s.addEventListener('change', updateSelectColors);
@@ -572,14 +612,23 @@
     document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
     updateSelectColors();
     renderState();
+    updateSaveBtn();
   }
 
   // ── Submit ───────────────────────────────────────────────────────────────────
 
   async function submitForm() {
+    // Show overwrite warning if contact has prior LIQ data and this isn't a confirmed proceed
+    if (!_pendingSave && !isNew && hasExistingLiqData) {
+      document.getElementById('overwriteAlert').classList.remove('hidden');
+      return;
+    }
+    _pendingSave = false;
+
     const btn = document.getElementById('submitBtn');
     btn.disabled = true;
     btn.textContent = 'Saving…';
+    document.getElementById('overwriteAlert').classList.add('hidden');
     document.getElementById('submitError').style.display = 'none';
 
     const active = blockMap.filter(b => b.active());
@@ -662,6 +711,12 @@
   }
 
   renderState();
+  // For new contacts the baseline is the fully-blank form after initial render.
+  // Existing contacts set their baseline inside the fetch .then() after prefill.
+  if (isNew) {
+    initialFormState = serializeForm();
+    updateSaveBtn();
+  }
 </script>
 </body>
 </html>

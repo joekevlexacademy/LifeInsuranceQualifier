@@ -217,6 +217,7 @@ async def get_contact(location_id: str = Query(...), contact_id: str = Query(...
             cfg.get("field_existing_coverage_id"): "existing_coverage",
             cfg.get("field_prior_outcome_id"):    "prior_outcome",
             cfg.get("field_underwriting_notes_id"): "underwriting_notes",
+            cfg.get("field_qual_summary_id"):     "qual_summary",
         }
         _liq_keys.pop(None, None)  # remove any unconfigured fields
         for cf in (contact.get("customFields") or []):
