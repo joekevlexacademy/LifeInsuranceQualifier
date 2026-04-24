@@ -311,15 +311,11 @@ async def submit_qualification(payload: QualificationSubmission):
         if cfg.get(cfg_key) and value
     ]
 
-    # Standard GHL contact fields (written back, not just read)
+    # Standard GHL contact fields (written back, not just read).
+    # Note: GHL PUT /contacts/{id} does not accept "gender" — state only.
     extra: dict = {}
     if payload.state:
         extra["state"] = payload.state
-    if payload.sex_at_birth:
-        _gender_map = {"Male": "male", "Female": "female"}
-        ghl_gender = _gender_map.get(payload.sex_at_birth)
-        if ghl_gender:
-            extra["gender"] = ghl_gender
 
     try:
         if custom_fields or extra:
