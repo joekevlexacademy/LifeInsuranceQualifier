@@ -95,15 +95,32 @@
   <!-- Screen 1: Welcome -->
   <div class="screen active" id="s1">
     <h2>Set up in 60 seconds</h2>
-    <p class="sub">One click connects your GoHighLevel sub-account and configures everything automatically.</p>
+    <p class="sub">Connect your GoHighLevel sub-account and configure everything automatically.</p>
     <ul class="checklist">
-      <li><span class="check-icon">✓</span> Connects to your GHL sub-account via OAuth</li>
       <li><span class="check-icon">✓</span> Creates all 5 qualification contact fields</li>
-      <li><span class="check-icon">✓</span> Activates the qualifier on contact records</li>
+      <li><span class="check-icon">✓</span> Adds a sidebar menu link for quick access</li>
       <li><span class="check-icon">✓</span> No manual steps required</li>
     </ul>
-    <div class="note"><strong>You'll need:</strong> GoHighLevel admin access to the sub-account you're installing into.</div>
-    <button class="btn btn-primary" onclick="startOAuth()">Connect GoHighLevel →</button>
+    <div class="note"><strong>You'll need:</strong> GoHighLevel admin access and a Private Integration key for the sub-account.</div>
+    <button class="btn btn-primary" onclick="show('s_loc')">Set up with Location ID →</button>
+    <button class="btn btn-ghost" style="margin-top:10px" onclick="startOAuth()">Connect via OAuth instead</button>
+  </div>
+
+  <!-- Screen 1a: Enter Location ID manually -->
+  <div class="screen" id="s_loc">
+    <h2>Enter Location ID</h2>
+    <p class="sub">Paste your GHL sub-account Location ID to begin setup.</p>
+    <div class="note">
+      <strong>Where to find it:</strong><br>
+      In GHL, open the sub-account. The ID is in the URL:<br>
+      <code style="background:rgba(122,162,255,0.1);border-radius:4px;padding:2px 6px;font-size:0.82rem;">app.gohighlevel.com/v2/location/<strong>YOUR_ID</strong>/...</code>
+    </div>
+    <input type="text" id="locIdInput"
+      placeholder="e.g. zSbEBiJYVLkbN8ThBQDL"
+      style="width:100%;padding:12px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:12px;color:#eef2ff;font:inherit;font-size:0.95rem;margin-bottom:16px;outline:none;"
+    />
+    <button class="btn btn-primary" id="locIdBtn">Next →</button>
+    <div class="error-msg" id="locIdError"></div>
   </div>
 
   <!-- Screen 1b: Location picker (company-level installs) -->
@@ -164,7 +181,7 @@
 <script>
   const params = new URLSearchParams(location.search);
   const step = params.get('step');
-  const locationId = params.get('location_id');
+  let locationId = params.get('location_id');
   const companyId = params.get('company_id');
 
   function show(id) {
@@ -305,6 +322,18 @@
       document.getElementById('setupError').textContent = e.message;
     }
   }
+
+  document.getElementById('locIdBtn').onclick = () => {
+    const val = document.getElementById('locIdInput').value.trim();
+    const errEl = document.getElementById('locIdError');
+    errEl.style.display = 'none';
+    if (!val) { errEl.textContent = 'Please enter your Location ID.'; errEl.style.display = 'block'; return; }
+    locationId = val;
+    runSetup();
+  };
+  document.getElementById('locIdInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('locIdBtn').click();
+  });
 
   // Auto-advance to setup screen if returning from OAuth
   if (step === 'setup' && locationId) {

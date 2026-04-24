@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Life Insurance Qualifier</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      background: linear-gradient(135deg, #0a1020 0%, #0f1a35 100%);
+      color: #eef2ff;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .card {
+      background: rgba(19, 26, 46, 0.92);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 44px 48px;
+      width: 100%; max-width: 480px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+    }
+    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+    .logo-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: linear-gradient(135deg, #7aa2ff, #8ef0d0);
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+    }
+    .logo-text { font-size: 1.1rem; font-weight: 700; }
+    .logo-sub  { font-size: 0.82rem; color: #9fb0d9; margin-top: 2px; }
+    h2 { margin: 0 0 8px; font-size: 1.45rem; letter-spacing: -0.02em; }
+    .sub { color: #9fb0d9; margin: 0 0 28px; line-height: 1.6; font-size: 0.95rem; }
+    label { display: block; font-size: 0.88rem; color: #9fb0d9; margin-bottom: 8px; }
+    input {
+      width: 100%; padding: 13px 14px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px; color: #eef2ff;
+      font: inherit; font-size: 0.95rem;
+      margin-bottom: 8px; outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: rgba(122,162,255,0.55); }
+    .hint {
+      font-size: 0.82rem; color: #7a90c0; margin-bottom: 24px; line-height: 1.5;
+    }
+    .hint code {
+      background: rgba(122,162,255,0.1); border-radius: 4px;
+      padding: 1px 5px; font-size: 0.8rem; color: #a0b8e8;
+    }
+    .btn {
+      width: 100%; padding: 15px; border: 0; border-radius: 13px;
+      font: inherit; font-weight: 700; font-size: 1rem; cursor: pointer;
+      background: linear-gradient(135deg, #7aa2ff, #8ef0d0); color: #05101a;
+      transition: opacity 0.15s, transform 0.12s;
+    }
+    .btn:hover { transform: translateY(-1px); opacity: 0.92; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .error-msg {
+      color: #ff9b9b; font-size: 0.88rem; margin-top: 12px;
+      background: rgba(255,155,155,0.08); border: 1px solid rgba(255,155,155,0.25);
+      border-radius: 10px; padding: 12px 14px; display: none;
+    }
+    .divider { display: flex; align-items: center; gap: 12px; margin: 24px 0; }
+    .divider hr { flex: 1; border: none; border-top: 1px solid rgba(255,255,255,0.08); }
+    .divider span { font-size: 0.8rem; color: #5a6e99; }
+    .btn-ghost {
+      width: 100%; padding: 13px; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 13px; font: inherit; font-weight: 600; font-size: 0.95rem;
+      cursor: pointer; background: rgba(255,255,255,0.05); color: #9fb0d9;
+      transition: opacity 0.15s, transform 0.12s;
+    }
+    .btn-ghost:hover { transform: translateY(-1px); opacity: 0.85; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">🛡</div>
+    <div>
+      <div class="logo-text">Life Insurance Qualifier</div>
+      <div class="logo-sub">GoHighLevel App</div>
+    </div>
+  </div>
+
+  <h2>Open your workspace</h2>
+  <p class="sub">Enter your GHL sub-account (location) ID to access the qualifier.</p>
+
+  <label for="locInput">Sub-account Location ID</label>
+  <input id="locInput" type="text" placeholder="e.g. zSbEBiJYVLkbN8ThBQDL" autocomplete="off" spellcheck="false" />
+  <p class="hint">
+    Find it in your GHL URL:<br>
+    <code>app.gohighlevel.com/v2/location/<strong>YOUR_ID</strong>/dashboard</code>
+  </p>
+
+  <button class="btn" id="goBtn">Open App →</button>
+  <div class="error-msg" id="errMsg"></div>
+
+  <div class="divider"><hr><span>first time?</span><hr></div>
+  <button class="btn-ghost" onclick="window.location.href='/setup'">Set up a new sub-account →</button>
+</div>
+
+<script>
+  document.getElementById('locInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('goBtn').click();
+  });
+
+  document.getElementById('goBtn').onclick = async () => {
+    const id = document.getElementById('locInput').value.trim();
+    const errEl = document.getElementById('errMsg');
+    errEl.style.display = 'none';
+
+    if (!id) {
+      errEl.textContent = 'Please enter your Location ID.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    const btn = document.getElementById('goBtn');
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+
+    try {
+      const res = await fetch(`/api/location?location_id=${encodeURIComponent(id)}`);
+      if (res.ok) {
+        window.location.href = `/?location_id=${encodeURIComponent(id)}`;
+      } else {
+        const data = await res.json().catch(() => ({}));
+        errEl.textContent = data.detail || 'Location not found or not yet set up. Try running setup first.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Open App →';
+      }
+    } catch {
+      errEl.textContent = 'Could not reach the server. Please try again.';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Open App →';
+    }
+  };
+</script>
+</body>
+</html>

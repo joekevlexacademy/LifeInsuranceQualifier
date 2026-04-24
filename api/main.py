@@ -35,9 +35,11 @@ async def setup_page():
 
 
 @app.get("/", response_class=HTMLResponse)
-async def home(location_id: str = Query(...)):
+async def home(location_id: str = Query(None)):
+    if not location_id:
+        return _html("landing.html")
     if not app_config.is_setup_complete(location_id):
-        return RedirectResponse("/setup")
+        return RedirectResponse(f"/setup?step=setup&location_id={location_id}")
     return _html("app.html")
 
 
