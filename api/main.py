@@ -376,6 +376,12 @@ async def search_contacts(location_id: str = Query(...), q: str = Query(...)):
     }
 
 
+@app.delete("/api/qualifications")
+async def clear_qualifications(location_id: str = Query(...)):
+    _sb().table("qualifications").delete().eq("location_id", location_id).execute()
+    return {"ok": True}
+
+
 @app.get("/api/qualifications/recent")
 async def recent_qualifications(location_id: str = Query(...)):
     result = (

@@ -101,6 +101,34 @@
       float: right; background: none; border: none; color: #9fb0d9;
       font-size: 1.3rem; cursor: pointer; margin-top: -4px;
     }
+    .clear-btn {
+      background: none; border: 1px solid rgba(255,155,155,0.25);
+      color: #ff9b9b; border-radius: 8px; padding: 5px 12px;
+      font: inherit; font-size: 0.78rem; font-weight: 600;
+      cursor: pointer; transition: background 0.15s, border-color 0.15s;
+    }
+    .clear-btn:hover { background: rgba(255,155,155,0.08); border-color: rgba(255,155,155,0.5); }
+    .confirm-input {
+      width: 100%; border: 1px solid #33406c; background: rgba(7,11,24,0.8);
+      color: #eef2ff; border-radius: 11px; padding: 12px 14px;
+      font: inherit; font-size: 1rem; outline: none; margin: 16px 0;
+      transition: border-color 0.2s; text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .confirm-input:focus { border-color: #ff9b9b; }
+    .btn-danger {
+      width: 100%; padding: 13px; border: 0; border-radius: 11px;
+      font: inherit; font-weight: 700; font-size: 0.95rem; cursor: pointer;
+      background: rgba(255,100,100,0.85); color: #fff;
+      transition: opacity 0.15s;
+    }
+    .btn-danger:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-danger:not(:disabled):hover { opacity: 0.88; }
+    .btn-cancel {
+      width: 100%; padding: 11px; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 11px; font: inherit; font-size: 0.9rem; cursor: pointer;
+      background: rgba(255,255,255,0.05); color: #9fb0d9; margin-top: 8px;
+    }
+    .btn-cancel:hover { background: rgba(255,255,255,0.08); }
   </style>
 </head>
 <body>
@@ -126,9 +154,38 @@
     </div>
   </div>
 
-  <div class="section-title">Recent qualifications</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <div class="section-title" style="margin-bottom:0;">Recent qualifications</div>
+    <button class="clear-btn" id="clearListBtn" onclick="openClearModal()">Clear list</button>
+  </div>
   <div class="recent-list" id="recentList">
     <div class="empty">Loading…</div>
+  </div>
+</div>
+
+<!-- Clear list confirmation modal -->
+<div class="modal-overlay" id="clearModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeClearModal()">✕</button>
+    <h3>Clear recent qualifications?</h3>
+    <p style="color:#9fb0d9;font-size:0.9rem;margin:0 0 4px;">
+      This will permanently delete all recent qualification records for
+      <strong id="clearLocationName" style="color:#eef2ff;"></strong>.
+      Records in other sub-accounts are not affected.
+    </p>
+    <p style="color:#9fb0d9;font-size:0.9rem;margin:0;">
+      Type <strong style="color:#ff9b9b;letter-spacing:0.06em;">CLEAR</strong> to confirm.
+    </p>
+    <input
+      class="confirm-input" id="clearConfirmInput"
+      placeholder="Type CLEAR to confirm"
+      oninput="onClearInput()"
+      autocomplete="off"
+    />
+    <button class="btn-danger" id="clearConfirmBtn" disabled onclick="confirmClear()">
+      Clear list
+    </button>
+    <button class="btn-cancel" onclick="closeClearModal()">Cancel</button>
   </div>
 </div>
 
@@ -269,6 +326,42 @@
   document.getElementById('searchModal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeSearch();
   });
+  document.getElementById('clearModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeClearModal();
+  });
+
+  function openClearModal() {
+    document.getElementById('clearLocationName').textContent =
+      document.getElementById('locationName').textContent || locationId;
+    document.getElementById('clearConfirmInput').value = '';
+    document.getElementById('clearConfirmBtn').disabled = true;
+    document.getElementById('clearModal').classList.add('open');
+    setTimeout(() => document.getElementById('clearConfirmInput').focus(), 50);
+  }
+  function closeClearModal() {
+    document.getElementById('clearModal').classList.remove('open');
+    document.getElementById('clearConfirmInput').value = '';
+    document.getElementById('clearConfirmBtn').disabled = true;
+  }
+  function onClearInput() {
+    const val = document.getElementById('clearConfirmInput').value;
+    document.getElementById('clearConfirmBtn').disabled = (val !== 'CLEAR');
+  }
+  async function confirmClear() {
+    document.getElementById('clearConfirmBtn').disabled = true;
+    try {
+      const res = await fetch(`/api/qualifications?location_id=${encodeURIComponent(locationId)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      closeClearModal();
+      document.getElementById('recentList').innerHTML =
+        '<div class="empty">No qualifications yet. Start with a contact above.</div>';
+    } catch (e) {
+      document.getElementById('clearConfirmBtn').disabled = false;
+      alert('Failed to clear list: ' + e.message);
+    }
+  }
 
   function initApp() {
     document.getElementById('newContactBtn').href = `/qualify?location_id=${locationId}`;
