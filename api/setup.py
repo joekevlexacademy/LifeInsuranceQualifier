@@ -142,9 +142,9 @@ async def run(
         base = os.environ["APP_BASE_URL"].rstrip("/")
         if not base.startswith("http"):
             base = "https://" + base
-        # GHL substitutes {{location.id}} with the active sub-account ID at runtime,
-        # so one shared menu link works for every sub-account.
-        menu_url = base + "/?location_id={{location.id}}"
+        # Plain base URL — no query params that could fail GHL's URL validator.
+        # The active sub-account is detected client-side via the GHL parent frame.
+        menu_url = base + "/"
 
         # Match by title only — URL no longer contains a fixed location_id.
         existing = next(
@@ -158,10 +158,12 @@ async def run(
             existing_locs = list(existing.get("locations") or [])
             if location_id not in existing_locs:
                 existing_locs.append(location_id)
-            already_dynamic = "location.id" in existing.get("url", "")
+            existing_url = existing.get("url", "")
             is_iframe = existing.get("openMode") == "iframe"
             already_listed = location_id in (existing.get("locations") or [])
-            if is_iframe and already_dynamic and already_listed:
+            # Good if: iframe mode, no hardcoded location_id in URL, this location already listed
+            url_clean = "location_id=" not in existing_url or "location.id" in existing_url
+            if is_iframe and url_clean and already_listed:
                 steps.append({"label": "Sidebar menu link found", "ok": True})
             else:
                 await ghl.update_custom_menu(

@@ -153,25 +153,36 @@
   const params = new URLSearchParams(location.search);
   const locationId = params.get('location_id') || '';
 
-  // If the GHL template variable wasn't substituted (or URL has no location_id),
-  // request the active sub-account from the GHL parent frame via postMessage.
+  // When loaded from the GHL sidebar (no location_id in URL), detect the active
+  // sub-account via multiple fallbacks:
+  //   1. GHL parent URL embedded in document.referrer (/location/<ID>/)
+  //   2. GHL postMessage (REQUEST_USER_DATA protocol)
+  //   3. Timeout error with guidance
   if (!locationId || locationId.startsWith('{{')) {
     document.getElementById('locationName').textContent = 'Connecting…';
-    const ghlTimeout = setTimeout(() => {
-      document.getElementById('locationName').textContent = 'Sub-account not detected';
-      document.getElementById('recentList').innerHTML =
-        '<div class="empty">Could not detect your sub-account. Try opening this app from a direct link.</div>';
-    }, 5000);
-    window.addEventListener('message', function handler(event) {
-      const d = event.data;
-      const lid = d?.locationId || d?.location_id || d?.data?.locationId;
-      if (lid) {
-        clearTimeout(ghlTimeout);
-        window.removeEventListener('message', handler);
-        window.location.replace('/?location_id=' + encodeURIComponent(lid));
-      }
-    });
-    window.parent.postMessage({ message: 'REQUEST_USER_DATA' }, '*');
+
+    // Fallback 1: GHL's parent frame URL always contains /location/<ID>/
+    const refMatch = document.referrer.match(/\/location\/([a-zA-Z0-9_-]{10,})/);
+    if (refMatch) {
+      window.location.replace('/?location_id=' + refMatch[1]);
+    } else {
+      // Fallback 2: postMessage
+      const ghlTimeout = setTimeout(() => {
+        document.getElementById('locationName').textContent = 'Sub-account not detected';
+        document.getElementById('recentList').innerHTML =
+          '<div class="empty">Could not detect your sub-account. Open GHL → Custom Menu Links and check that this app\'s URL has your location ID, or re-run Setup.</div>';
+      }, 5000);
+      window.addEventListener('message', function handler(event) {
+        const d = event.data;
+        const lid = d?.locationId || d?.location_id || d?.data?.locationId;
+        if (lid) {
+          clearTimeout(ghlTimeout);
+          window.removeEventListener('message', handler);
+          window.location.replace('/?location_id=' + encodeURIComponent(lid));
+        }
+      });
+      window.parent.postMessage({ message: 'REQUEST_USER_DATA' }, '*');
+    }
   } else {
     initApp();
   }

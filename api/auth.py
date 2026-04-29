@@ -99,6 +99,31 @@ async def save_api_key_installation(company_id: str, location_id: str, api_key: 
     }).execute()
 
 
+async def get_any_menu_token() -> str | None:
+    """Return any valid OAuth token with custom-menu-link.write scope.
+
+    PIKs lack this scope, so for menu operations during PIK-only setups we find
+    the first OAuth installation (has a refresh_token) stored in Supabase.
+    """
+    sb = _sb()
+    rows = (
+        sb.table("installations")
+        .select("access_token, expires_at, location_id, refresh_token")
+        .neq("refresh_token", "")
+        .limit(5)
+        .execute()
+    )
+    now = datetime.now(timezone.utc) + timedelta(minutes=5)
+    for row in rows.data or []:
+        try:
+            if datetime.fromisoformat(row["expires_at"]) > now:
+                return row["access_token"]
+            return await _refresh(row["location_id"])
+        except Exception:
+            continue
+    return None
+
+
 async def get_agency_id(location_id: str) -> str | None:
     """Look up the company/agency id stored alongside a location's installation row."""
     sb = _sb()

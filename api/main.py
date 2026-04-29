@@ -36,11 +36,9 @@ async def setup_page():
 
 @app.get("/", response_class=HTMLResponse)
 async def home(location_id: str = Query(None)):
-    if not location_id:
-        return _html("landing.html")
-    # If GHL didn't substitute the template variable, serve app.html so the
-    # postMessage fallback can detect the real location ID client-side.
-    if location_id.startswith("{{"):
+    # No location_id: serve app.html so the GHL iframe can detect the sub-account
+    # via document.referrer / postMessage and redirect with the real ID.
+    if not location_id or location_id.startswith("{{"):
         return _html("app.html")
     if not app_config.is_setup_complete(location_id):
         return RedirectResponse(f"/setup?step=setup&location_id={location_id}")
@@ -179,11 +177,17 @@ async def run_setup_with_key(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to save API key: {exc}")
 
-    # PIK is location-scoped and lacks custom-menu-link.write; fetch the agency OAuth token separately
+    # PIK is location-scoped and lacks custom-menu-link.write; use a stored OAuth token instead.
     agency_tok: str | None = None
     if company_id and company_id != location_id:
         try:
             agency_tok = await auth.get_valid_token(company_id)
+        except Exception:
+            pass
+    # Fall back to any OAuth token already in Supabase (from first-install OAuth flow).
+    if not agency_tok:
+        try:
+            agency_tok = await auth.get_any_menu_token()
         except Exception:
             pass
 
