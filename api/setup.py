@@ -155,7 +155,7 @@ async def run(
                 base = "https://" + base
             # No location_id in the URL — the client detects the active sub-account
             # via a picker or GHL postMessage when the app loads.
-            menu_url = base + "/"
+            menu_url = base + "/?location_id={{location.id}}"
 
             # Match by title only.
             existing = next(
@@ -180,8 +180,8 @@ async def run(
                     (loc["id"] if isinstance(loc, dict) else loc)
                     for loc in (existing.get("locations") or [])
                 ]
-                # "clean" means no hardcoded location_id query param
-                url_clean = "location_id=" not in existing_url
+                # "clean" means the URL already uses the GHL template variable
+                url_clean = "location_id={{location.id}}" in existing_url
                 if is_iframe and url_clean and already_listed:
                     steps.append({"label": "Sidebar menu link found", "ok": True})
                 else:
