@@ -211,7 +211,12 @@
     const el = document.getElementById(id);
     if (!el) return;
     el.className = 'check-icon' + (state === 'ok' ? ' ok' : state === 'err' ? ' err' : state === 'spin' ? ' spin' : '');
-    el.textContent = state === 'ok' ? '✓' : state === 'err' ? '✕' : state === 'spin' ? '↻' : '·';
+    el.textContent = state === 'ok' ? '✓' : state === 'err' ? '✕' : state === 'warn' ? '!' : state === 'spin' ? '↻' : '·';
+    if (state === 'warn') {
+      el.style.background = 'rgba(255,212,138,0.15)';
+      el.style.borderColor = 'rgba(255,212,138,0.4)';
+      el.style.color = '#ffd48a';
+    }
   }
 
   let _companyId = null;
@@ -239,11 +244,11 @@
       const s = result.steps[i];
       markIcon(fieldIcons[i], s ? (s.ok ? 'ok' : 'err') : fallback);
     }
-    // steps[15] = sidebar menu link
+    // steps[15] = sidebar menu link (non-critical — shown as warning, never blocks)
     markIcon('ic-menu', 'spin');
     await new Promise(r => setTimeout(r, 350));
     const menuStep = result.steps[15];
-    markIcon('ic-menu', menuStep ? (menuStep.ok ? 'ok' : 'err') : fallback);
+    markIcon('ic-menu', menuStep ? (menuStep.ok ? 'ok' : 'warn') : fallback);
     // steps[16] = config save
     markIcon('ic-save', 'spin');
     await new Promise(r => setTimeout(r, 300));
@@ -253,26 +258,16 @@
       window.location.href = `/?location_id=${effectiveLocationId}`;
     };
 
-    const failed = result.steps.filter(s => !s.ok);
-    if (failed.length > 0) {
+    if (result.success) {
+      // Fields and config saved — advance automatically regardless of menu step
+      await new Promise(r => setTimeout(r, 800));
+      show('s3');
+    } else {
+      // Critical failure — show what went wrong
+      const failed = result.steps.filter(s => !s.ok);
       const errEl = document.getElementById('setupError');
       errEl.style.display = 'block';
-      const prefix = result.success ? 'Warning' : 'Setup failed';
-      errEl.textContent = `${prefix}: ${failed.map(s => s.label).join(' | ')}`;
-
-      if (result.success) {
-        // Don't auto-advance when there are warnings — let the user read them and
-        // click the button manually.
-        const cont = document.createElement('button');
-        cont.className = 'btn btn-primary';
-        cont.style.marginTop = '14px';
-        cont.textContent = 'Continue to app →';
-        cont.onclick = () => show('s3');
-        errEl.insertAdjacentElement('afterend', cont);
-      }
-    } else if (result.success) {
-      await new Promise(r => setTimeout(r, 600));
-      show('s3');
+      errEl.textContent = `Setup failed: ${failed.map(s => s.label).join(' | ')}`;
     }
   }
 
