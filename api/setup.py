@@ -142,17 +142,21 @@ async def run(
         base = os.environ["APP_BASE_URL"].rstrip("/")
         if not base.startswith("http"):
             base = "https://" + base
-        menu_url = f"{base}/?location_id={location_id}"
+        # GHL substitutes {{location.id}} with the active sub-account ID at runtime,
+        # so one shared menu link works for every sub-account.
+        menu_url = base + "/?location_id={{location.id}}"
 
+        # Match by title only — URL no longer contains a fixed location_id.
         existing = next(
             (m for m in existing_menus
-             if (m.get("title") or m.get("name")) == MENU_NAME and location_id in m.get("url", "")),
+             if (m.get("title") or m.get("name")) == MENU_NAME),
             None,
         )
-        if existing and existing.get("openMode") == "iframe":
+        already_dynamic = "location.id" in existing.get("url", "") if existing else False
+        if existing and existing.get("openMode") == "iframe" and already_dynamic:
             steps.append({"label": "Sidebar menu link found", "ok": True})
         elif existing:
-            # Already exists but was created with new_tab — upgrade to iframe
+            # Upgrade: switch to iframe mode and/or replace hardcoded URL with template
             menu_id = existing.get("id") or existing.get("_id")
             await ghl.update_custom_menu(
                 access_token=menu_token,
@@ -161,7 +165,7 @@ async def run(
                 url=menu_url,
                 location_id=location_id,
             )
-            steps.append({"label": "Sidebar menu link updated to embedded mode", "ok": True})
+            steps.append({"label": "Sidebar menu link updated to dynamic URL", "ok": True})
         else:
             await ghl.create_custom_menu(
                 access_token=menu_token,

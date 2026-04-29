@@ -38,6 +38,10 @@ async def setup_page():
 async def home(location_id: str = Query(None)):
     if not location_id:
         return _html("landing.html")
+    # If GHL didn't substitute the template variable, serve app.html so the
+    # postMessage fallback can detect the real location ID client-side.
+    if location_id.startswith("{{"):
+        return _html("app.html")
     if not app_config.is_setup_complete(location_id):
         return RedirectResponse(f"/setup?step=setup&location_id={location_id}")
     return _html("app.html")
