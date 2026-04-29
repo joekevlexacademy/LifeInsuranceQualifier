@@ -100,23 +100,34 @@ async def save_api_key_installation(company_id: str, location_id: str, api_key: 
 
 
 async def get_agency_key(company_id: str) -> str | None:
-    """Return the stored agency-level key — only the company-level row (location_id = company_id).
-    Never falls back to subaccount rows so we never accidentally return a PIK without menu scope."""
+    """Return a valid agency-level token — only the company-level row (location_id = company_id).
+    Refreshes OAuth tokens automatically if expired. Never falls back to subaccount rows."""
     sb = _sb()
-    rows = sb.table("installations").select("access_token").eq("location_id", company_id).execute()
-    if rows.data:
-        return rows.data[0].get("access_token") or None
-    return None
+    rows = sb.table("installations").select(
+        "access_token, expires_at, refresh_token"
+    ).eq("location_id", company_id).execute()
+    if not rows.data:
+        return None
+    record = rows.data[0]
+    # PIK — never expires, return directly
+    if not record.get("refresh_token"):
+        return record.get("access_token") or None
+    # OAuth token — check expiry and refresh if needed
+    try:
+        expires_at = datetime.fromisoformat(record["expires_at"])
+        if expires_at > datetime.now(timezone.utc) + timedelta(minutes=5):
+            return record["access_token"]
+        return await _refresh(company_id)
+    except Exception:
+        return None
 
 
 async def save_agency_key(company_id: str, api_key: str) -> None:
     """Store an agency-level PIK for menu operations.
-    Never overwrites an existing OAuth installation (which has a non-empty refresh_token).
+    Always overwrites — a freshly entered PIK takes precedence over any stale or
+    expired OAuth token that may be sitting in the company row.
     """
     sb = _sb()
-    existing = sb.table("installations").select("refresh_token").eq("location_id", company_id).execute()
-    if existing.data and existing.data[0].get("refresh_token"):
-        return  # Preserve existing OAuth token
     far_future = (datetime.now(timezone.utc) + timedelta(days=36500)).isoformat()
     sb.table("installations").upsert({
         "location_id": company_id,
