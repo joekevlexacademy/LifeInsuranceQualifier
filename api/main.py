@@ -168,6 +168,7 @@ async def run_setup_with_key(
     location_id: str = Query(...),
     company_id: str = Query(None),
     api_key: str = Body(..., embed=True),
+    agency_key: str | None = Body(None, embed=True),
 ):
     """Setup using a GHL Private Integration key (for agency-level installs)."""
     # Resolve company_id in priority order:
@@ -188,10 +189,17 @@ async def run_setup_with_key(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to save API key: {exc}")
 
-    # For menu operations the app needs its agency OAuth token (custom-menu-link.write scope).
-    # Try in order: agency row by company_id → any stored OAuth token.
-    agency_tok: str | None = None
-    if company_id and company_id != location_id:
+    # Store agency key if provided — persisted under company_id so future setups
+    # can use it without re-entering it.
+    if agency_key and company_id:
+        try:
+            await auth.save_agency_key(company_id, agency_key)
+        except Exception:
+            pass
+
+    # For menu operations: explicit agency_key > stored company token > any OAuth token.
+    agency_tok: str | None = agency_key
+    if not agency_tok and company_id and company_id != location_id:
         try:
             agency_tok = await auth.get_valid_token(company_id)
         except Exception:

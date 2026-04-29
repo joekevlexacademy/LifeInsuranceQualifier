@@ -99,6 +99,25 @@ async def save_api_key_installation(company_id: str, location_id: str, api_key: 
     }).execute()
 
 
+async def save_agency_key(company_id: str, api_key: str) -> None:
+    """Store an agency-level PIK for menu operations.
+    Never overwrites an existing OAuth installation (which has a non-empty refresh_token).
+    """
+    sb = _sb()
+    existing = sb.table("installations").select("refresh_token").eq("location_id", company_id).execute()
+    if existing.data and existing.data[0].get("refresh_token"):
+        return  # Preserve existing OAuth token
+    far_future = (datetime.now(timezone.utc) + timedelta(days=36500)).isoformat()
+    sb.table("installations").upsert({
+        "location_id": company_id,
+        "agency_id": company_id,
+        "access_token": api_key,
+        "refresh_token": "",
+        "expires_at": far_future,
+        "uninstalled_at": None,
+    }).execute()
+
+
 async def get_any_menu_token() -> str | None:
     """Return any valid OAuth token with custom-menu-link.write scope.
 

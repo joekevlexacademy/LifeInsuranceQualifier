@@ -135,20 +135,31 @@
 
   <!-- Screen 1c: Private Integration key -->
   <div class="screen" id="s_key">
-    <h2>Private Integration key</h2>
-    <p class="sub">Required to create qualification fields inside <strong id="pickedName"></strong>.</p>
+    <h2>Integration keys</h2>
+    <p class="sub">Connect <strong id="pickedName"></strong> to Life Insurance Qualifier.</p>
+
     <div class="note">
-      <strong>How to create one in GHL:</strong><br><br>
-      1. In GHL, click the sub-account name in the top-left to switch <em>into</em> the sub-account (not the agency view).<br><br>
-      2. Go to <strong>Settings → Private Integrations</strong> (left sidebar, under Integrations).<br><br>
-      3. Click <strong>+ New Integration</strong>, give it any name (e.g. <em>Life Insurance Qualifier</em>), and save.<br><br>
-      4. Copy the key that appears and paste it below.<br><br>
-      <strong>Required scopes:</strong> Contacts, Custom Fields, Notes, Locations, Custom Menu Links — or select all to be safe.
+      <strong>Sub-account key (required)</strong><br>
+      Switch <em>into</em> the sub-account in GHL → Settings → Private Integrations → New Integration.<br>
+      <strong>Scopes:</strong> Contacts, Custom Fields, Notes, Locations — or select all.
     </div>
     <input type="password" id="apiKeyInput"
-      placeholder="Paste Private Integration key…"
+      placeholder="Paste sub-account Private Integration key…"
+      style="width:100%;padding:12px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:12px;color:#eef2ff;font:inherit;font-size:0.95rem;margin-bottom:20px;outline:none;"
+    />
+
+    <div class="note" style="margin-top:0">
+      <strong>Agency key (optional — enter once per agency)</strong><br>
+      Lets the app automatically create and update the sidebar menu link for all sub-accounts.<br>
+      From the <em>agency view</em> → Settings → Private Integrations → New Integration.<br>
+      <strong>Scope required:</strong> Edit Custom Menu Links (custom-menu-link.write)<br>
+      <span style="color:#7aa2ff;font-size:0.82rem;">Leave blank if already entered for this agency.</span>
+    </div>
+    <input type="password" id="agencyKeyInput"
+      placeholder="Paste agency Private Integration key (optional)…"
       style="width:100%;padding:12px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:12px;color:#eef2ff;font:inherit;font-size:0.95rem;margin-bottom:16px;outline:none;"
     />
+
     <button class="btn btn-primary" id="apiKeyBtn">Complete Setup →</button>
     <div class="error-msg" id="apiKeyError"></div>
   </div>
@@ -284,19 +295,23 @@
 
   document.getElementById('apiKeyBtn').onclick = async () => {
     const apiKey = document.getElementById('apiKeyInput').value.trim();
+    const agencyKey = document.getElementById('agencyKeyInput').value.trim();
     const errEl = document.getElementById('apiKeyError');
     errEl.style.display = 'none';
-    if (!apiKey) { errEl.textContent = 'Please paste your Private Integration key.'; errEl.style.display = 'block'; return; }
+    if (!apiKey) { errEl.textContent = 'Please paste your sub-account Private Integration key.'; errEl.style.display = 'block'; return; }
 
     show('s2');
     markIcon('ic-f1', 'spin');
     document.getElementById('locationLabel').textContent = `Configuring ${document.getElementById('pickedName').textContent}…`;
     try {
-      const params = new URLSearchParams({ location_id: _pickedLocationId, company_id: _companyId });
+      const params = new URLSearchParams({ location_id: _pickedLocationId });
+      if (_companyId) params.set('company_id', _companyId);
+      const body = { api_key: apiKey };
+      if (agencyKey) body.agency_key = agencyKey;
       const result = await callSetup(`/api/setup/run?${params}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: apiKey }),
+        body: JSON.stringify(body),
       });
       await animateAndFinish(result, _pickedLocationId);
     } catch (e) {
