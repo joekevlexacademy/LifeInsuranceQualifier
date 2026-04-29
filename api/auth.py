@@ -102,6 +102,8 @@ async def save_api_key_installation(company_id: str, location_id: str, api_key: 
 async def get_agency_key(company_id: str) -> str | None:
     """Return a valid agency-level token — only the company-level row (location_id = company_id).
     Refreshes OAuth tokens automatically if expired. Never falls back to subaccount rows."""
+    if not company_id:
+        return None
     sb = _sb()
     rows = sb.table("installations").select(
         "access_token, expires_at, refresh_token"
@@ -127,8 +129,16 @@ async def save_agency_key(company_id: str, api_key: str) -> None:
     Always overwrites — a freshly entered PIK takes precedence over any stale or
     expired OAuth token that may be sitting in the company row.
     """
+    if not company_id:
+        return
     sb = _sb()
     far_future = (datetime.now(timezone.utc) + timedelta(days=36500)).isoformat()
+    # Remove orphaned null-location rows left by pre-fix installs that ran
+    # save_agency_key(None, ...) before company_id resolution was added.
+    try:
+        sb.table("installations").delete().is_("location_id", "null").execute()
+    except Exception:
+        pass
     sb.table("installations").upsert({
         "location_id": company_id,
         "agency_id": company_id,

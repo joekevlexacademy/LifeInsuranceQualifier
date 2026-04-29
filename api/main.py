@@ -258,11 +258,13 @@ async def run_setup_with_key(
         except Exception:
             pass
 
-    # For menu operations: explicit agency_key > stored company token > any OAuth token.
+    # For menu operations: explicit agency_key > stored agency-level PIK > any OAuth token.
+    # Use get_agency_key (not get_valid_token) so we never accidentally pick up a
+    # subaccount PIK or a stale/revoked token from the company row.
     agency_tok: str | None = agency_key
     if not agency_tok and company_id and company_id != location_id:
         try:
-            agency_tok = await auth.get_valid_token(company_id)
+            agency_tok = await auth.get_agency_key(company_id)
         except Exception:
             pass
     if not agency_tok:
