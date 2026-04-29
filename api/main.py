@@ -84,34 +84,35 @@ async def oauth_callback(code: str = Query(...)):
 # ── Debug ─────────────────────────────────────────────────────────────────────
 
 @app.get("/api/debug/menu")
-async def debug_menu(location_id: str = Query(...)):
-    """Attempt custom menu list + create and return raw GHL response for debugging."""
-    token = await auth.get_valid_token(location_id)
+async def debug_menu(location_id: str = Query(...), agency_key: str = Query(None)):
+    """Test agency key against GHL custom-menus API and show stored key info."""
     result: dict = {}
+
+    # Show what's stored for this location's agency
+    company_id = await auth.get_agency_id(location_id)
+    result["stored_company_id"] = company_id
+    result["is_self_referencing"] = (company_id == location_id)
+    if company_id:
+        stored_key = await auth.get_agency_key(company_id)
+        result["stored_agency_key_prefix"] = stored_key[:12] + "…" if stored_key else None
+
+    # Test whichever key is available: explicit param > stored > location token
+    test_key = agency_key or (await auth.get_agency_key(company_id) if company_id else None)
+    if not test_key:
+        try:
+            test_key = await auth.get_valid_token(location_id)
+        except Exception:
+            pass
+    result["test_key_prefix"] = test_key[:12] + "…" if test_key else None
+
     try:
-        existing = await ghl.list_custom_menus(token, location_id)
-        result["existing"] = existing
+        existing = await ghl.list_custom_menus(test_key, company_id or location_id)
+        result["list_ok"] = True
+        result["menu_count"] = len(existing)
+        result["menus"] = [{"title": m.get("title") or m.get("name"), "id": m.get("id") or m.get("_id"), "locations": len(m.get("locations") or [])} for m in existing]
     except Exception as exc:
         result["list_error"] = str(exc)
-        return result
 
-    menu_name = "Life Insurance Qualifier"
-    if any(m.get("name") == menu_name for m in existing):
-        result["status"] = "already_exists"
-        return result
-
-    try:
-        menu_url = os.environ["APP_BASE_URL"] + "/?location_id={location.id}"
-        created = await ghl.create_custom_menu(
-            access_token=token,
-            company_id=location_id,
-            name=menu_name,
-            url=menu_url,
-        )
-        result["created"] = created
-        result["status"] = "created"
-    except Exception as exc:
-        result["create_error"] = str(exc)
     return result
 
 
