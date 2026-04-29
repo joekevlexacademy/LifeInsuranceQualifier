@@ -170,7 +170,16 @@ async def run_setup_with_key(
     api_key: str = Body(..., embed=True),
 ):
     """Setup using a GHL Private Integration key (for agency-level installs)."""
-    # If caller didn't pass company_id, try to derive it from an existing install row
+    # Resolve company_id in priority order:
+    #   1. Caller-supplied query param
+    #   2. GHL /locations/{id} response (companyId field) — works with any PIK that has locations.readonly
+    #   3. Existing Supabase row for this location
+    if not company_id:
+        try:
+            loc_data = await ghl.get_location(api_key, location_id)
+            company_id = loc_data.get("companyId") or loc_data.get("parentId")
+        except Exception:
+            pass
     if not company_id:
         company_id = await auth.get_agency_id(location_id)
 
@@ -179,14 +188,14 @@ async def run_setup_with_key(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to save API key: {exc}")
 
-    # PIK is location-scoped and lacks custom-menu-link.write; use a stored OAuth token instead.
+    # For menu operations the app needs its agency OAuth token (custom-menu-link.write scope).
+    # Try in order: agency row by company_id → any stored OAuth token.
     agency_tok: str | None = None
     if company_id and company_id != location_id:
         try:
             agency_tok = await auth.get_valid_token(company_id)
         except Exception:
             pass
-    # Fall back to any OAuth token already in Supabase (from first-install OAuth flow).
     if not agency_tok:
         try:
             agency_tok = await auth.get_any_menu_token()
