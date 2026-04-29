@@ -126,6 +126,8 @@ def _menu_payload(name: str, url: str, locations: list | None = None) -> dict:
         "openMode": "iframe",
         "locations": locations or [],
         "userRole": "all",
+        "allowCamera": False,
+        "allowMicrophone": False,
     }
 
 
