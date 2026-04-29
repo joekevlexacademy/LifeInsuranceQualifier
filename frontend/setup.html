@@ -302,18 +302,25 @@
     }
   };
 
+  function goToKeyScreen() {
+    _pickedLocationId = locationId;
+    document.getElementById('pickedName').textContent = locationId;
+    show('s_key');
+  }
+
   async function runSetup() {
     show('s2');
 
-    // Detect company vs location install
     try {
       const locRes = await fetch(`/api/location?location_id=${locationId}`);
       if (locRes.ok) {
+        // Existing installation — can run setup using stored token
         const locData = await locRes.json();
         document.getElementById('locationLabel').textContent = `Configuring ${locData.name || 'your sub-account'}…`;
       } else {
-        const locsRes = await fetch(`/api/setup/locations?location_id=${locationId}`);
-        if (locsRes.ok) {
+        // No installation row — check for company-level OAuth install
+        const locsRes = await fetch(`/api/setup/locations?location_id=${locationId}`).catch(() => null);
+        if (locsRes?.ok) {
           const locsData = await locsRes.json();
           if (locsData.locations?.length > 0) {
             _companyId = locationId;
@@ -321,10 +328,17 @@
             return;
           }
         }
+        // Brand-new location with no stored token — collect PIK first
+        goToKeyScreen();
+        return;
       }
-    } catch (_) {}
+    } catch (_) {
+      // Network error — collect PIK before proceeding
+      goToKeyScreen();
+      return;
+    }
 
-    // Normal location-level install — run setup directly
+    // Existing location-level install — run setup with stored token
     markIcon('ic-f1', 'spin');
     try {
       const qs = new URLSearchParams({ location_id: locationId });
