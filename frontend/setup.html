@@ -164,6 +164,25 @@
     <div class="error-msg" id="apiKeyError"></div>
   </div>
 
+  <!-- Screen 1d: Agency key for existing installations -->
+  <div class="screen" id="s_agency">
+    <h2>One more step</h2>
+    <p class="sub"><strong id="agencyPickedName"></strong> is already configured. Add an agency key to enable automatic sidebar menu link management for all sub-accounts.</p>
+    <div class="note">
+      <strong>Agency Integration Key</strong><br>
+      From the <em>agency view</em> → Settings → Private Integrations → New Integration.<br>
+      <strong>Required scope:</strong> Edit Custom Menu Links (custom-menu-link.write)<br>
+      <span style="color:#7aa2ff;font-size:0.82rem;">Stored once — reused for all future sub-account setups.</span>
+    </div>
+    <input type="password" id="agencyOnlyKeyInput"
+      placeholder="Paste agency Private Integration key…"
+      style="width:100%;padding:12px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:12px;color:#eef2ff;font:inherit;font-size:0.95rem;margin-bottom:16px;outline:none;"
+    />
+    <button class="btn btn-primary" id="agencyOnlyBtn">Save & Complete Setup →</button>
+    <button class="btn btn-ghost" id="agencyOnlySkipBtn">Skip — run setup without menu</button>
+    <div class="error-msg" id="agencyOnlyError"></div>
+  </div>
+
   <!-- Screen 2: Auto-setup running -->
   <div class="screen" id="s2">
     <h2>Setting up…</h2>
@@ -326,15 +345,37 @@
     show('s_key');
   }
 
+  async function runSetupDirect() {
+    markIcon('ic-f1', 'spin');
+    try {
+      const qs = new URLSearchParams({ location_id: locationId });
+      if (companyId) qs.set('company_id', companyId);
+      const result = await callSetup(`/api/setup/run?${qs}`);
+      await animateAndFinish(result, locationId);
+    } catch (e) {
+      document.getElementById('setupError').style.display = 'block';
+      document.getElementById('setupError').textContent = e.message;
+    }
+  }
+
   async function runSetup() {
     show('s2');
 
     try {
       const locRes = await fetch(`/api/location?location_id=${locationId}`);
       if (locRes.ok) {
-        // Existing installation — can run setup using stored token
+        // Existing installation — check if agency key is stored
         const locData = await locRes.json();
         document.getElementById('locationLabel').textContent = `Configuring ${locData.name || 'your sub-account'}…`;
+
+        const akRes = await fetch(`/api/setup/has-agency-key?location_id=${locationId}`).catch(() => null);
+        const hasAgencyKey = akRes?.ok ? (await akRes.json()).has_agency_key : true;
+        if (!hasAgencyKey) {
+          _pickedLocationId = locationId;
+          document.getElementById('agencyPickedName').textContent = locData.name || locationId;
+          show('s_agency');
+          return;
+        }
       } else {
         // No installation row — check for company-level OAuth install
         const locsRes = await fetch(`/api/setup/locations?location_id=${locationId}`).catch(() => null);
@@ -356,18 +397,35 @@
       return;
     }
 
-    // Existing location-level install — run setup with stored token
+    // Existing install with agency key already stored — run directly
+    await runSetupDirect();
+  }
+
+  document.getElementById('agencyOnlyBtn').onclick = async () => {
+    const agencyKey = document.getElementById('agencyOnlyKeyInput').value.trim();
+    const errEl = document.getElementById('agencyOnlyError');
+    errEl.style.display = 'none';
+    if (!agencyKey) { errEl.textContent = 'Please paste your agency key, or click Skip.'; errEl.style.display = 'block'; return; }
+    show('s2');
     markIcon('ic-f1', 'spin');
+    document.getElementById('locationLabel').textContent = `Updating ${document.getElementById('agencyPickedName').textContent}…`;
     try {
-      const qs = new URLSearchParams({ location_id: locationId });
-      if (companyId) qs.set('company_id', companyId);
-      const result = await callSetup(`/api/setup/run?${qs}`);
-      await animateAndFinish(result, locationId);
+      const result = await callSetup(`/api/setup/agency-key?location_id=${_pickedLocationId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agency_key: agencyKey }),
+      });
+      await animateAndFinish(result, _pickedLocationId);
     } catch (e) {
       document.getElementById('setupError').style.display = 'block';
       document.getElementById('setupError').textContent = e.message;
     }
-  }
+  };
+
+  document.getElementById('agencyOnlySkipBtn').onclick = () => {
+    show('s2');
+    runSetupDirect();
+  };
 
   document.getElementById('locIdBtn').onclick = () => {
     const val = document.getElementById('locIdInput').value.trim();

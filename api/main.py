@@ -117,6 +117,49 @@ async def debug_menu(location_id: str = Query(...)):
 
 # ── Setup API ──────────────────────────────────────────────────────────────────
 
+@app.get("/api/setup/has-agency-key")
+async def has_agency_key(location_id: str = Query(...)):
+    """Return whether an agency-level key is already stored for this location's agency."""
+    sb = _sb()
+    company_id = await auth.get_agency_id(location_id)
+    if not company_id:
+        return {"has_agency_key": False}
+    rows = sb.table("installations").select("access_token").eq("location_id", company_id).execute()
+    return {"has_agency_key": bool(rows.data and rows.data[0].get("access_token"))}
+
+
+@app.post("/api/setup/agency-key")
+async def store_agency_key_and_run(
+    location_id: str = Query(...),
+    agency_key: str = Body(..., embed=True),
+):
+    """Store an agency-level PIK and re-run setup for an already-configured location."""
+    try:
+        location_token = await auth.get_valid_token(location_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Token lookup failed: {exc}")
+
+    company_id = await auth.get_agency_id(location_id)
+    if not company_id:
+        try:
+            loc_data = await ghl.get_location(location_token, location_id)
+            company_id = loc_data.get("companyId") or loc_data.get("parentId")
+        except Exception:
+            pass
+
+    if company_id:
+        try:
+            await auth.save_agency_key(company_id, agency_key)
+        except Exception:
+            pass
+
+    return await app_setup.run(
+        location_id, location_token,
+        company_id=company_id,
+        agency_token=agency_key,
+    )
+
+
 @app.get("/api/setup/locations")
 async def list_setup_locations(location_id: str = Query(...)):
     try:
