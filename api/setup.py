@@ -134,67 +134,89 @@ async def run(
     all_ok = all(s["ok"] for s in steps)
 
     # steps[15] — sidebar menu link (non-blocking: failure won't prevent config save)
-    # Use agency_token when available (guaranteed scope); fall back to access_token
-    # (works if the PIK was created with Custom Menu Links read+write scope).
-    menu_token = agency_token or access_token
+    # Subaccount PIKs are rejected by GHL's agency-scoped custom-menu endpoints
+    # ("Invalid Private Integration token"), so only attempt when we have a
+    # dedicated agency-level token.
     menu_cid = company_id or location_id
     menu_url: str = ""
-    try:
-        existing_menus = await ghl.list_custom_menus(menu_token, menu_cid)
-        base = os.environ["APP_BASE_URL"].rstrip("/")
-        if not base.startswith("http"):
-            base = "https://" + base
-        # No location_id in the URL — the client detects the active sub-account
-        # via a picker or GHL postMessage when the app loads.
-        menu_url = base + "/"
+    if not agency_token:
+        steps.append({
+            "label": (
+                "Sidebar menu link skipped — enter an agency-level Private Integration key "
+                "(agency view → Settings → Private Integrations) and re-run setup to enable"
+            ),
+            "ok": False,
+        })
+    else:
+        try:
+            existing_menus = await ghl.list_custom_menus(agency_token, menu_cid)
+            base = os.environ["APP_BASE_URL"].rstrip("/")
+            if not base.startswith("http"):
+                base = "https://" + base
+            # No location_id in the URL — the client detects the active sub-account
+            # via a picker or GHL postMessage when the app loads.
+            menu_url = base + "/"
 
-        # Match by title only.
-        existing = next(
-            (m for m in existing_menus
-             if (m.get("title") or m.get("name")) == MENU_NAME),
-            None,
-        )
-        if existing:
-            menu_id = existing.get("id") or existing.get("_id")
-            # GHL may return locations as strings OR as objects {"id": "...", ...}.
-            # Normalise to a plain list of ID strings so membership checks work.
-            raw_locs = existing.get("locations") or []
-            existing_locs = [
-                (loc["id"] if isinstance(loc, dict) else loc)
-                for loc in raw_locs
-            ]
-            if location_id not in existing_locs:
-                existing_locs.append(location_id)
-            existing_url = existing.get("url", "")
-            is_iframe = existing.get("openMode") == "iframe"
-            already_listed = location_id in [
-                (loc["id"] if isinstance(loc, dict) else loc)
-                for loc in (existing.get("locations") or [])
-            ]
-            # "clean" means no hardcoded location_id query param
-            url_clean = "location_id=" not in existing_url
-            if is_iframe and url_clean and already_listed:
-                steps.append({"label": "Sidebar menu link found", "ok": True})
+            # Match by title only.
+            existing = next(
+                (m for m in existing_menus
+                 if (m.get("title") or m.get("name")) == MENU_NAME),
+                None,
+            )
+            if existing:
+                menu_id = existing.get("id") or existing.get("_id")
+                # GHL may return locations as strings OR as objects {"id": "...", ...}.
+                # Normalise to a plain list of ID strings so membership checks work.
+                raw_locs = existing.get("locations") or []
+                existing_locs = [
+                    (loc["id"] if isinstance(loc, dict) else loc)
+                    for loc in raw_locs
+                ]
+                if location_id not in existing_locs:
+                    existing_locs.append(location_id)
+                existing_url = existing.get("url", "")
+                is_iframe = existing.get("openMode") == "iframe"
+                already_listed = location_id in [
+                    (loc["id"] if isinstance(loc, dict) else loc)
+                    for loc in (existing.get("locations") or [])
+                ]
+                # "clean" means no hardcoded location_id query param
+                url_clean = "location_id=" not in existing_url
+                if is_iframe and url_clean and already_listed:
+                    steps.append({"label": "Sidebar menu link found", "ok": True})
+                else:
+                    await ghl.update_custom_menu(
+                        access_token=agency_token,
+                        menu_id=menu_id,
+                        name=MENU_NAME,
+                        url=menu_url,
+                        locations=existing_locs,
+                    )
+                    steps.append({"label": "Sidebar menu link updated", "ok": True})
             else:
-                await ghl.update_custom_menu(
-                    access_token=menu_token,
-                    menu_id=menu_id,
+                await ghl.create_custom_menu(
+                    access_token=agency_token,
+                    company_id=menu_cid,
                     name=MENU_NAME,
                     url=menu_url,
-                    locations=existing_locs,
+                    locations=[location_id],
                 )
-                steps.append({"label": "Sidebar menu link updated", "ok": True})
-        else:
-            await ghl.create_custom_menu(
-                access_token=menu_token,
-                company_id=menu_cid,
-                name=MENU_NAME,
-                url=menu_url,
-                locations=[location_id],
-            )
-            steps.append({"label": "Sidebar menu link created", "ok": True})
-    except Exception as exc:
-        steps.append({"label": f"Sidebar menu link failed: {exc} [url={menu_url!r}]", "ok": False})
+                steps.append({"label": "Sidebar menu link created", "ok": True})
+        except Exception as exc:
+            err_str = str(exc)
+            label = f"Sidebar menu link failed: {exc} [url={menu_url!r}]"
+            # If the stored agency key is revoked, clear it from Supabase so the
+            # next setup run detects no key and prompts the user to enter a new one.
+            if company_id and "Invalid Private Integration" in err_str:
+                try:
+                    sb.table("installations").update({
+                        "access_token": "",
+                        "refresh_token": "",
+                    }).eq("location_id", company_id).execute()
+                except Exception:
+                    pass
+                label += " — agency key appears revoked; re-run setup to enter a new one"
+            steps.append({"label": label, "ok": False})
 
     # steps[16] — config save
     if all_ok:
