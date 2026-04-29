@@ -207,6 +207,29 @@ async def run_setup_with_key(
 
 # ── App API ────────────────────────────────────────────────────────────────────
 
+@app.get("/api/configured-locations")
+async def configured_locations():
+    """Return all sub-accounts that have completed setup, with names from GHL."""
+    sb = _sb()
+    rows = (
+        sb.table("location_config")
+        .select("location_id")
+        .eq("setup_complete", True)
+        .execute()
+    )
+    locations = []
+    for row in rows.data or []:
+        lid = row["location_id"]
+        try:
+            token = await auth.get_valid_token(lid)
+            loc_data = await ghl.get_location(token, lid)
+            name = loc_data.get("name") or lid
+        except Exception:
+            name = lid
+        locations.append({"id": lid, "name": name})
+    return {"locations": locations}
+
+
 @app.get("/api/location")
 async def get_location(location_id: str = Query(...)):
     token = await auth.get_valid_token(location_id)

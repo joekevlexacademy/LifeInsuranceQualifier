@@ -153,35 +153,63 @@
   const params = new URLSearchParams(location.search);
   const locationId = params.get('location_id') || '';
 
-  // When loaded from the GHL sidebar (no location_id in URL), detect the active
-  // sub-account via multiple fallbacks:
-  //   1. GHL parent URL embedded in document.referrer (/location/<ID>/)
-  //   2. GHL postMessage (REQUEST_USER_DATA protocol)
-  //   3. Timeout error with guidance
+  // When loaded from the GHL sidebar menu (no location_id in URL), detect the
+  // active sub-account via:
+  //   1. GHL postMessage (REQUEST_USER_DATA) — works for published apps
+  //   2. Sub-account picker — always works, lists all configured sub-accounts
   if (!locationId || locationId.startsWith('{{')) {
     document.getElementById('locationName').textContent = 'Connecting…';
+    document.getElementById('recentList').innerHTML = '<div class="empty">Loading…</div>';
 
-    // Fallback 1: GHL's parent frame URL always contains /location/<ID>/
-    const refMatch = document.referrer.match(/\/location\/([a-zA-Z0-9_-]{10,})/);
-    if (refMatch) {
-      window.location.replace('/?location_id=' + refMatch[1]);
-    } else {
-      // Fallback 2: postMessage
-      const ghlTimeout = setTimeout(() => {
-        document.getElementById('locationName').textContent = 'Sub-account not detected';
-        document.getElementById('recentList').innerHTML =
-          '<div class="empty">Could not detect your sub-account. Open GHL → Custom Menu Links and check that this app\'s URL has your location ID, or re-run Setup.</div>';
-      }, 5000);
-      window.addEventListener('message', function handler(event) {
-        const d = event.data;
-        const lid = d?.locationId || d?.location_id || d?.data?.locationId;
-        if (lid) {
-          clearTimeout(ghlTimeout);
-          window.removeEventListener('message', handler);
-          window.location.replace('/?location_id=' + encodeURIComponent(lid));
+    let resolved = false;
+
+    function resolveLocation(lid) {
+      if (resolved) return;
+      resolved = true;
+      window.location.replace('/?location_id=' + encodeURIComponent(lid));
+    }
+
+    // Try GHL postMessage first (fast path for published apps)
+    const pmTimeout = setTimeout(() => {
+      if (!resolved) showLocationPicker();
+    }, 2000);
+
+    window.addEventListener('message', function handler(event) {
+      const d = event.data;
+      const lid = d?.locationId || d?.location_id || d?.data?.locationId;
+      if (lid) {
+        clearTimeout(pmTimeout);
+        window.removeEventListener('message', handler);
+        resolveLocation(lid);
+      }
+    });
+    window.parent.postMessage({ message: 'REQUEST_USER_DATA' }, '*');
+
+    async function showLocationPicker() {
+      document.getElementById('locationName').textContent = 'Select your sub-account';
+      try {
+        const res = await fetch('/api/configured-locations');
+        const { locations } = await res.json();
+        if (!locations.length) {
+          document.getElementById('recentList').innerHTML =
+            '<div class="empty">No sub-accounts set up yet. <a href="/setup" style="color:var(--accent)">Run Setup →</a></div>';
+          return;
         }
-      });
-      window.parent.postMessage({ message: 'REQUEST_USER_DATA' }, '*');
+        document.getElementById('recentList').innerHTML =
+          '<div class="empty" style="margin-bottom:8px">Choose the sub-account you want to open:</div>' +
+          locations.map(l => `
+            <a class="recent-item" href="/?location_id=${encodeURIComponent(l.id)}">
+              <div class="recent-info">
+                <strong>${l.name}</strong>
+                <span style="font-size:0.78rem;opacity:0.6">${l.id}</span>
+              </div>
+              <span style="color:var(--accent)">→</span>
+            </a>`).join('');
+      } catch (e) {
+        document.getElementById('locationName').textContent = 'Could not load sub-accounts';
+        document.getElementById('recentList').innerHTML =
+          `<div class="empty">Error: ${e.message}</div>`;
+      }
     }
   } else {
     initApp();

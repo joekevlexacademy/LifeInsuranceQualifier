@@ -152,8 +152,9 @@ async def run(
             base = os.environ["APP_BASE_URL"].rstrip("/")
             if not base.startswith("http"):
                 base = "https://" + base
-            # GHL supports {{location.id}} as a merge field — substituted at runtime.
-            menu_url = base + "/?location_id={{location.id}}"
+            # No location_id in the URL — the client detects the active sub-account
+            # via a picker or GHL postMessage when the app loads.
+            menu_url = base + "/"
 
             # Match by title only.
             existing = next(
@@ -178,7 +179,8 @@ async def run(
                     (loc["id"] if isinstance(loc, dict) else loc)
                     for loc in (existing.get("locations") or [])
                 ]
-                url_clean = "location_id=" not in existing_url or "location.id" in existing_url
+                # "clean" means no hardcoded location_id query param
+                url_clean = "location_id=" not in existing_url
                 if is_iframe and url_clean and already_listed:
                     steps.append({"label": "Sidebar menu link found", "ok": True})
                 else:
