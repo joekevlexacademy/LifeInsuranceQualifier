@@ -36,9 +36,11 @@ async def setup_page():
 
 @app.get("/", response_class=HTMLResponse)
 async def home(location_id: str = Query(None)):
-    # No location_id: serve app.html so the GHL iframe can detect the sub-account
-    # via document.referrer / postMessage and redirect with the real ID.
-    if not location_id or location_id.startswith("{{"):
+    if not location_id:
+        return _html("landing.html")
+    # GHL may load the menu URL before substituting {{location.id}} — serve
+    # app.html so the client can detect the real sub-account via referrer/postMessage.
+    if location_id.startswith("{{"):
         return _html("app.html")
     if not app_config.is_setup_complete(location_id):
         return RedirectResponse(f"/setup?step=setup&location_id={location_id}")

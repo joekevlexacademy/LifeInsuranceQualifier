@@ -142,11 +142,10 @@ async def run(
         base = os.environ["APP_BASE_URL"].rstrip("/")
         if not base.startswith("http"):
             base = "https://" + base
-        # Plain base URL — no query params that could fail GHL's URL validator.
-        # The active sub-account is detected client-side via the GHL parent frame.
-        menu_url = base + "/"
+        # GHL supports {{location.id}} as a merge field — substituted at runtime.
+        menu_url = base + "/?location_id={{location.id}}"
 
-        # Match by title only — URL no longer contains a fixed location_id.
+        # Match by title only.
         existing = next(
             (m for m in existing_menus
              if (m.get("title") or m.get("name")) == MENU_NAME),
@@ -154,14 +153,21 @@ async def run(
         )
         if existing:
             menu_id = existing.get("id") or existing.get("_id")
-            # Preserve every sub-account already in the list and add this one.
-            existing_locs = list(existing.get("locations") or [])
+            # GHL may return locations as strings OR as objects {"id": "...", ...}.
+            # Normalise to a plain list of ID strings so membership checks work.
+            raw_locs = existing.get("locations") or []
+            existing_locs = [
+                (loc["id"] if isinstance(loc, dict) else loc)
+                for loc in raw_locs
+            ]
             if location_id not in existing_locs:
                 existing_locs.append(location_id)
             existing_url = existing.get("url", "")
             is_iframe = existing.get("openMode") == "iframe"
-            already_listed = location_id in (existing.get("locations") or [])
-            # Good if: iframe mode, no hardcoded location_id in URL, this location already listed
+            already_listed = location_id in [
+                (loc["id"] if isinstance(loc, dict) else loc)
+                for loc in (existing.get("locations") or [])
+            ]
             url_clean = "location_id=" not in existing_url or "location.id" in existing_url
             if is_iframe and url_clean and already_listed:
                 steps.append({"label": "Sidebar menu link found", "ok": True})
