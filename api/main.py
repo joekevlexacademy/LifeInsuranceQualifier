@@ -120,12 +120,13 @@ async def debug_menu(location_id: str = Query(...)):
 @app.get("/api/setup/has-agency-key")
 async def has_agency_key(location_id: str = Query(...)):
     """Return whether an agency-level key is already stored for this location's agency."""
-    sb = _sb()
     company_id = await auth.get_agency_id(location_id)
-    if not company_id:
+    # Self-referencing means the row was created before company_id resolution was added —
+    # treat as no agency key so the user is prompted to enter one.
+    if not company_id or company_id == location_id:
         return {"has_agency_key": False}
-    rows = sb.table("installations").select("access_token").eq("location_id", company_id).execute()
-    return {"has_agency_key": bool(rows.data and rows.data[0].get("access_token"))}
+    key = await auth.get_agency_key(company_id)
+    return {"has_agency_key": bool(key)}
 
 
 @app.post("/api/setup/agency-key")
@@ -140,10 +141,15 @@ async def store_agency_key_and_run(
         raise HTTPException(status_code=500, detail=f"Token lookup failed: {exc}")
 
     company_id = await auth.get_agency_id(location_id)
-    if not company_id:
+
+    # Fix stale self-referencing rows and resolve real company_id from GHL
+    if not company_id or company_id == location_id:
         try:
             loc_data = await ghl.get_location(location_token, location_id)
-            company_id = loc_data.get("companyId") or loc_data.get("parentId")
+            real_cid = loc_data.get("companyId") or loc_data.get("parentId")
+            if real_cid and real_cid != location_id:
+                company_id = real_cid
+                _sb().table("installations").update({"agency_id": real_cid}).eq("location_id", location_id).execute()
         except Exception:
             pass
 
@@ -187,21 +193,32 @@ async def run_setup(location_id: str = Query(...), company_id: str = Query(None)
     if not company_id:
         company_id = await auth.get_agency_id(location_id)
 
-    # Menu creation needs the agency OAuth token (custom-menu-link.write).
-    # If the location row IS the agency row, reuse its token; otherwise look it up.
+    # Self-referencing means the row was saved before company_id resolution existed.
+    # Fetch the real company_id from GHL and repair the stale row.
+    if not company_id or company_id == location_id:
+        try:
+            loc_data = await ghl.get_location(location_token, location_id)
+            real_cid = loc_data.get("companyId") or loc_data.get("parentId")
+            if real_cid and real_cid != location_id:
+                company_id = real_cid
+                _sb().table("installations").update({"agency_id": real_cid}).eq("location_id", location_id).execute()
+        except Exception:
+            pass
+
+    # Menu operations need the agency-level key (custom-menu-link.write scope).
+    # Use get_agency_key to avoid accidentally picking up a subaccount PIK via fallback.
     agency_token: str | None = None
-    if company_id:
-        if company_id == location_id:
-            agency_token = location_token
-        else:
-            try:
-                agency_token = await auth.get_valid_token(company_id)
-            except Exception:
-                agency_token = None
-            try:
-                await auth.ensure_location_installation(company_id, location_id)
-            except Exception as exc:
-                raise HTTPException(status_code=500, detail=f"Failed to register location: {exc}")
+    if company_id and company_id != location_id:
+        agency_token = await auth.get_agency_key(company_id)
+        try:
+            await auth.ensure_location_installation(company_id, location_id)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to register location: {exc}")
+    if not agency_token:
+        try:
+            agency_token = await auth.get_any_menu_token()
+        except Exception:
+            pass
 
     return await app_setup.run(location_id, location_token, company_id=company_id, agency_token=agency_token)
 

@@ -99,6 +99,16 @@ async def save_api_key_installation(company_id: str, location_id: str, api_key: 
     }).execute()
 
 
+async def get_agency_key(company_id: str) -> str | None:
+    """Return the stored agency-level key — only the company-level row (location_id = company_id).
+    Never falls back to subaccount rows so we never accidentally return a PIK without menu scope."""
+    sb = _sb()
+    rows = sb.table("installations").select("access_token").eq("location_id", company_id).execute()
+    if rows.data:
+        return rows.data[0].get("access_token") or None
+    return None
+
+
 async def save_agency_key(company_id: str, api_key: str) -> None:
     """Store an agency-level PIK for menu operations.
     Never overwrites an existing OAuth installation (which has a non-empty refresh_token).
