@@ -289,8 +289,19 @@
     };
 
     if (result.success) {
-      // Fields and config saved — advance automatically regardless of menu step
-      await new Promise(r => setTimeout(r, 800));
+      const menuStep = result.steps[15];
+      if (menuStep && !menuStep.ok) {
+        // Show menu warning text briefly before advancing so the user can read it
+        const errEl = document.getElementById('setupError');
+        errEl.style.display = 'block';
+        errEl.style.color = '#ffd48a';
+        errEl.style.borderColor = 'rgba(255,212,138,0.25)';
+        errEl.style.background = 'rgba(255,212,138,0.07)';
+        errEl.textContent = menuStep.label;
+        await new Promise(r => setTimeout(r, 6000));
+      } else {
+        await new Promise(r => setTimeout(r, 800));
+      }
       show('s3');
     } else {
       // Critical failure — show what went wrong
