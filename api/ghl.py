@@ -115,16 +115,16 @@ async def list_custom_menus(access_token: str, company_id: str) -> list:
         return data.get("customMenus") or data.get("menus") or []
 
 
-def _menu_payload(name: str, url: str, location_id: Optional[str] = None) -> dict:
+def _menu_payload(name: str, url: str, locations: list | None = None) -> dict:
     return {
         "title": name,
         "url": url,
         "icon": {"name": "shield-alt", "fontFamily": "fas"},
         "showOnCompany": False,
         "showOnLocation": True,
-        "showToAllLocations": location_id is None,
+        "showToAllLocations": not locations,
         "openMode": "iframe",
-        "locations": [location_id] if location_id else [],
+        "locations": locations or [],
         "userRole": "all",
     }
 
@@ -134,14 +134,14 @@ async def create_custom_menu(
     company_id: str,
     name: str,
     url: str,
-    location_id: Optional[str] = None,
+    locations: list | None = None,
 ) -> dict:
-    """Create a sidebar custom menu link scoped to a specific location (or all if location_id is None)."""
+    """Create a sidebar custom menu link scoped to specific locations (or all if locations is None)."""
     async with httpx.AsyncClient() as client:
         r = await client.post(
             f"{GHL_BASE}/custom-menus/",
             headers=_headers(access_token),
-            json=_menu_payload(name, url, location_id),
+            json=_menu_payload(name, url, locations),
         )
         _check(r, "create custom menu")
         return r.json()
@@ -152,14 +152,14 @@ async def update_custom_menu(
     menu_id: str,
     name: str,
     url: str,
-    location_id: Optional[str] = None,
+    locations: list | None = None,
 ) -> dict:
-    """Update an existing custom menu link (e.g. to switch openMode to iframe)."""
+    """Update an existing custom menu link."""
     async with httpx.AsyncClient() as client:
         r = await client.put(
             f"{GHL_BASE}/custom-menus/{menu_id}",
             headers=_headers(access_token),
-            json=_menu_payload(name, url, location_id),
+            json=_menu_payload(name, url, locations),
         )
         _check(r, "update custom menu")
         return r.json()

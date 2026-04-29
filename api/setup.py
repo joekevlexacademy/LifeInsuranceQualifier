@@ -152,27 +152,33 @@ async def run(
              if (m.get("title") or m.get("name")) == MENU_NAME),
             None,
         )
-        already_dynamic = "location.id" in existing.get("url", "") if existing else False
-        if existing and existing.get("openMode") == "iframe" and already_dynamic:
-            steps.append({"label": "Sidebar menu link found", "ok": True})
-        elif existing:
-            # Upgrade: switch to iframe mode and/or replace hardcoded URL with template
+        if existing:
             menu_id = existing.get("id") or existing.get("_id")
-            await ghl.update_custom_menu(
-                access_token=menu_token,
-                menu_id=menu_id,
-                name=MENU_NAME,
-                url=menu_url,
-                location_id=location_id,
-            )
-            steps.append({"label": "Sidebar menu link updated to dynamic URL", "ok": True})
+            # Preserve every sub-account already in the list and add this one.
+            existing_locs = list(existing.get("locations") or [])
+            if location_id not in existing_locs:
+                existing_locs.append(location_id)
+            already_dynamic = "location.id" in existing.get("url", "")
+            is_iframe = existing.get("openMode") == "iframe"
+            already_listed = location_id in (existing.get("locations") or [])
+            if is_iframe and already_dynamic and already_listed:
+                steps.append({"label": "Sidebar menu link found", "ok": True})
+            else:
+                await ghl.update_custom_menu(
+                    access_token=menu_token,
+                    menu_id=menu_id,
+                    name=MENU_NAME,
+                    url=menu_url,
+                    locations=existing_locs,
+                )
+                steps.append({"label": "Sidebar menu link updated", "ok": True})
         else:
             await ghl.create_custom_menu(
                 access_token=menu_token,
                 company_id=menu_cid,
                 name=MENU_NAME,
                 url=menu_url,
-                location_id=location_id,
+                locations=[location_id],
             )
             steps.append({"label": "Sidebar menu link created", "ok": True})
     except Exception as exc:
