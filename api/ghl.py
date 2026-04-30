@@ -177,67 +177,6 @@ async def list_custom_fields(access_token: str, location_id: str) -> list:
         return r.json().get("customFields", [])
 
 
-async def list_custom_field_folders(access_token: str, location_id: str) -> list:
-    """
-    Try all known GHL folder endpoint variants and return whichever works.
-    Candidates (GHL docs are inconsistent — we probe until one succeeds):
-      1. Top-level  GET /custom-fields/folders?locationId=...
-      2. Top-level  GET /custom-fields/folder?locationId=...   (singular)
-      3. Location   GET /locations/{id}/customFields/folders
-    """
-    candidates = [
-        ("GET",  f"{GHL_BASE}/custom-fields/folders",            {"locationId": location_id}),
-        ("GET",  f"{GHL_BASE}/custom-fields/folder",             {"locationId": location_id}),
-        ("GET",  f"{GHL_BASE}/locations/{location_id}/customFields/folders", {}),
-    ]
-    last_err = ""
-    async with httpx.AsyncClient() as client:
-        for method, url, params in candidates:
-            r = await client.get(url, headers=_headers(access_token), params=params)
-            if r.status_code < 400:
-                data = r.json()
-                return (
-                    data.get("folders")
-                    or data.get("customFieldFolders")
-                    or data.get("folder")
-                    or []
-                )
-            last_err = f"{url} → HTTP {r.status_code}: {r.text[:200] or '<empty>'}"
-    raise Exception(f"GHL list custom field folders failed. Last: {last_err}")
-
-
-async def create_custom_field_folder(
-    access_token: str, location_id: str, name: str
-) -> str:
-    """
-    Create a custom field folder and return its ID.
-    Candidates (probe until one returns a folder ID):
-      1. Top-level  POST /custom-fields/folders  body: {name, locationId, model}
-      2. Top-level  POST /custom-fields/folder   body: {name, locationId, model}
-      3. Location   POST /locations/{id}/customFields/folders  body: {name, model}
-    """
-    candidates = [
-        (f"{GHL_BASE}/custom-fields/folders",                       {"name": name, "locationId": location_id, "model": "contact"}),
-        (f"{GHL_BASE}/custom-fields/folder",                        {"name": name, "locationId": location_id, "model": "contact"}),
-        (f"{GHL_BASE}/locations/{location_id}/customFields/folders", {"name": name, "model": "contact"}),
-    ]
-    last_err = ""
-    async with httpx.AsyncClient() as client:
-        for url, body in candidates:
-            r = await client.post(url, headers=_headers(access_token), json=body)
-            if r.status_code < 400:
-                data = r.json()
-                folder = (
-                    data.get("folder")
-                    or data.get("customFieldFolder")
-                    or data.get("folders", [{}])[0]
-                    or data
-                )
-                fid = folder.get("id") or folder.get("_id") or ""
-                if fid:
-                    return fid
-            last_err = f"{url} → HTTP {r.status_code}: {r.text[:200] or '<empty>'}"
-    raise Exception(f"GHL create custom field folder failed. Last: {last_err}")
 
 
 async def create_custom_field(
@@ -246,13 +185,10 @@ async def create_custom_field(
     name: str,
     data_type: str,
     options: Optional[list] = None,
-    group_id: Optional[str] = None,
 ) -> dict:
     payload: dict = {"name": name, "dataType": data_type, "model": "contact"}
     if options:
         payload["options"] = options
-    if group_id:
-        payload["groupId"] = group_id
     async with httpx.AsyncClient() as client:
         r = await client.post(
             f"{GHL_BASE}/locations/{location_id}/customFields",

@@ -121,24 +121,6 @@ async def run(
             "success": False,
         }
 
-    # Resolve or create the "Life Insurance Qualifier" custom field folder.
-    # Non-blocking: if GHL rejects the folder API the fields are still created ungrouped.
-    folder_id: str | None = None
-    try:
-        folders = await ghl.list_custom_field_folders(access_token, location_id)
-        existing_folder = next(
-            (f for f in folders if f.get("name") == MENU_NAME), None
-        )
-        if existing_folder:
-            folder_id = existing_folder.get("id") or existing_folder.get("_id")
-        else:
-            folder_id = await ghl.create_custom_field_folder(
-                access_token, location_id, MENU_NAME
-            )
-    except Exception as folder_exc:
-        print(f"[setup] Field folder unavailable (non-blocking): {folder_exc}")
-        folder_id = None  # fields created ungrouped
-
     for field_def in FIELDS:
         label = field_def["name"]
         try:
@@ -152,7 +134,6 @@ async def run(
                     name=label,
                     data_type=field_def["data_type"],
                     options=field_def.get("options"),
-                    group_id=folder_id,
                 )
                 config[field_def["config_key"]] = result["id"]
                 steps.append({"label": f"{label} field created", "ok": True})
