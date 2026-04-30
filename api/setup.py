@@ -1,3 +1,4 @@
+import asyncio
 import os
 from datetime import datetime, timezone
 from typing import Optional
@@ -138,6 +139,8 @@ async def run(
                 steps.append({"label": f"{label} field created", "ok": True})
         except Exception as exc:
             steps.append({"label": f"{label} field failed: {exc}", "ok": False})
+        # Brief pause between field creation calls to avoid GHL rate limiting
+        await asyncio.sleep(0.4)
 
     # steps[0..14] = the 15 fields. Compute all_ok before adding further steps.
     all_ok = all(s["ok"] for s in steps)
