@@ -177,31 +177,54 @@ async def list_custom_fields(access_token: str, location_id: str) -> list:
         return r.json().get("customFields", [])
 
 
+_FOLDER_PATHS = [
+    "/customFields/folders",
+    "/customFieldFolders",
+]
+
+
 async def list_custom_field_folders(access_token: str, location_id: str) -> list:
+    """Try both known GHL folder endpoint paths and return whichever works."""
+    last_exc: Exception = Exception("no folder endpoint tried")
     async with httpx.AsyncClient() as client:
-        r = await client.get(
-            f"{GHL_BASE}/locations/{location_id}/customFields/folders",
-            headers=_headers(access_token),
-        )
-        _check(r, "list custom field folders")
-        data = r.json()
-        return data.get("folders") or data.get("customFieldFolders") or []
+        for suffix in _FOLDER_PATHS:
+            r = await client.get(
+                f"{GHL_BASE}/locations/{location_id}{suffix}",
+                headers=_headers(access_token),
+            )
+            if r.status_code < 400:
+                data = r.json()
+                return data.get("folders") or data.get("customFieldFolders") or []
+            last_exc = Exception(
+                f"GHL list custom field folders ({suffix}) failed "
+                f"(HTTP {r.status_code}): {r.text[:300] or '<empty>'}"
+            )
+    raise last_exc
 
 
 async def create_custom_field_folder(
     access_token: str, location_id: str, name: str
 ) -> str:
-    """Create a custom field folder and return its ID."""
+    """Create a custom field folder and return its ID. Tries both known endpoint paths."""
+    last_exc: Exception = Exception("no folder endpoint tried")
     async with httpx.AsyncClient() as client:
-        r = await client.post(
-            f"{GHL_BASE}/locations/{location_id}/customFields/folders",
-            headers=_headers(access_token),
-            json={"name": name, "model": "contact"},
-        )
-        _check(r, "create custom field folder")
-        data = r.json()
-        folder = data.get("folder") or data.get("customFieldFolder") or data
-        return folder.get("id") or folder.get("_id") or ""
+        for suffix in _FOLDER_PATHS:
+            r = await client.post(
+                f"{GHL_BASE}/locations/{location_id}{suffix}",
+                headers=_headers(access_token),
+                json={"name": name, "model": "contact"},
+            )
+            if r.status_code < 400:
+                data = r.json()
+                folder = data.get("folder") or data.get("customFieldFolder") or data
+                fid = folder.get("id") or folder.get("_id") or ""
+                if fid:
+                    return fid
+            last_exc = Exception(
+                f"GHL create custom field folder ({suffix}) failed "
+                f"(HTTP {r.status_code}): {r.text[:300] or '<empty>'}"
+            )
+    raise last_exc
 
 
 async def create_custom_field(

@@ -135,8 +135,9 @@ async def run(
             folder_id = await ghl.create_custom_field_folder(
                 access_token, location_id, MENU_NAME
             )
-    except Exception:
-        folder_id = None  # folder grouping unavailable — fields created ungrouped
+    except Exception as folder_exc:
+        print(f"[setup] Field folder unavailable (non-blocking): {folder_exc}")
+        folder_id = None  # fields created ungrouped
 
     for field_def in FIELDS:
         label = field_def["name"]
