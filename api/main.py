@@ -1,4 +1,5 @@
 import os
+import random
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -43,7 +44,7 @@ async def home(location_id: str = Query(None)):
     if location_id.startswith("{{"):
         return _html("app.html")
     if not app_config.is_setup_complete(location_id):
-        return RedirectResponse(f"/setup?step=setup&location_id={location_id}")
+        return RedirectResponse(f"/setup?step=setup&location_id={location_id}&_cb={random.randint(100000,999999)}")
     return _html("app.html")
 
 
@@ -75,7 +76,7 @@ async def oauth_callback(code: str = Query(...)):
         ) from exc
 
     company_id = token_data.get("companyId")
-    redirect_url = f"/setup?step=setup&location_id={location_id}"
+    redirect_url = f"/setup?step=setup&location_id={location_id}&_cb={random.randint(100000,999999)}"
     if company_id and company_id != location_id:
         redirect_url += f"&company_id={company_id}"
     return RedirectResponse(redirect_url)

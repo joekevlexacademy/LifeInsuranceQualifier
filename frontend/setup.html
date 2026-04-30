@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Life Insurance Qualifier — Setup</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
@@ -97,7 +100,7 @@
     <h2>Set up in 60 seconds</h2>
     <p class="sub">Connect your GoHighLevel sub-account and configure everything automatically.</p>
     <ul class="checklist">
-      <li><span class="check-icon">✓</span> Creates all 15 qualification contact fields</li>
+      <li><span class="check-icon">✓</span> Creates all 16 qualification contact fields</li>
       <li><span class="check-icon">✓</span> Adds a sidebar menu link for quick access</li>
       <li><span class="check-icon">✓</span> No manual steps required</li>
     </ul>
@@ -189,21 +192,22 @@
     <p class="sub" id="locationLabel">Configuring your sub-account.</p>
     <ul class="checklist" id="setupSteps">
       <li id="step-connect"><span class="check-icon ok">✓</span> GHL account connected</li>
-      <li id="step-f1"><span class="check-icon spin" id="ic-f1">↻</span> Creating LIQ Triage State field</li>
-      <li id="step-f2"><span class="check-icon" id="ic-f2">·</span> Creating LIQ Product Direction field</li>
-      <li id="step-f3"><span class="check-icon" id="ic-f3">·</span> Creating LIQ Active Dependencies field</li>
-      <li id="step-f4"><span class="check-icon" id="ic-f4">·</span> Creating LIQ Coverage Amount field</li>
-      <li id="step-f5"><span class="check-icon" id="ic-f5">·</span> Creating LIQ Product Type field</li>
-      <li id="step-f6"><span class="check-icon" id="ic-f6">·</span> Creating LIQ Budget field</li>
-      <li id="step-f7"><span class="check-icon" id="ic-f7">·</span> Creating LIQ Urgency field</li>
-      <li id="step-f8"><span class="check-icon" id="ic-f8">·</span> Creating LIQ Occupation field</li>
-      <li id="step-f9"><span class="check-icon" id="ic-f9">·</span> Creating LIQ Height field</li>
-      <li id="step-f10"><span class="check-icon" id="ic-f10">·</span> Creating LIQ Weight field</li>
-      <li id="step-f11"><span class="check-icon" id="ic-f11">·</span> Creating LIQ Medications field</li>
-      <li id="step-f12"><span class="check-icon" id="ic-f12">·</span> Creating LIQ Existing Coverage field</li>
-      <li id="step-f13"><span class="check-icon" id="ic-f13">·</span> Creating LIQ Prior Outcome field</li>
-      <li id="step-f14"><span class="check-icon" id="ic-f14">·</span> Creating LIQ Underwriting Notes field</li>
-      <li id="step-f15"><span class="check-icon" id="ic-f15">·</span> Creating LIQ Qualification Summary field</li>
+      <li id="step-f1"><span class="check-icon spin" id="ic-f1">↻</span> LIQ Triage State field</li>
+      <li id="step-f2"><span class="check-icon" id="ic-f2">·</span> LIQ Product Type field</li>
+      <li id="step-f3"><span class="check-icon" id="ic-f3">·</span> LIQ Urgency field</li>
+      <li id="step-f4"><span class="check-icon" id="ic-f4">·</span> LIQ Existing Coverage field</li>
+      <li id="step-f5"><span class="check-icon" id="ic-f5">·</span> LIQ Prior Outcome field</li>
+      <li id="step-f6"><span class="check-icon" id="ic-f6">·</span> LIQ Coverage Amount field</li>
+      <li id="step-f7"><span class="check-icon" id="ic-f7">·</span> LIQ Budget field</li>
+      <li id="step-f8"><span class="check-icon" id="ic-f8">·</span> LIQ Coverage Reason field</li>
+      <li id="step-f9"><span class="check-icon" id="ic-f9">·</span> LIQ Applicant field</li>
+      <li id="step-f10"><span class="check-icon" id="ic-f10">·</span> LIQ Triage Flags field</li>
+      <li id="step-f11"><span class="check-icon" id="ic-f11">·</span> LIQ Product Direction field</li>
+      <li id="step-f12"><span class="check-icon" id="ic-f12">·</span> LIQ Active Dependencies field</li>
+      <li id="step-f13"><span class="check-icon" id="ic-f13">·</span> LIQ Medications field</li>
+      <li id="step-f14"><span class="check-icon" id="ic-f14">·</span> LIQ Underwriting Notes field</li>
+      <li id="step-f15"><span class="check-icon" id="ic-f15">·</span> LIQ Dependency Details field</li>
+      <li id="step-f16"><span class="check-icon" id="ic-f16">·</span> LIQ Qualification Summary field</li>
       <li id="step-menu"><span class="check-icon" id="ic-menu">·</span> Adding sidebar menu link</li>
       <li id="step-save"><span class="check-icon" id="ic-save">·</span> Saving configuration</li>
     </ul>
@@ -234,7 +238,7 @@
   }
 
   function startOAuth() {
-    window.location.href = '/oauth/start';
+    window.location.href = `/oauth/start?_cb=${_cb()}`;
   }
 
   function markIcon(id, state) {
@@ -264,32 +268,34 @@
     };
   }
 
+  function _cb() { return Math.floor(Math.random() * 900000) + 100000; }
+
   async function animateAndFinish(result, effectiveLocationId) {
-    // steps[0..14] = 15 custom fields
-    const fieldIcons = ['ic-f1','ic-f2','ic-f3','ic-f4','ic-f5','ic-f6','ic-f7','ic-f8','ic-f9','ic-f10','ic-f11','ic-f12','ic-f13','ic-f14','ic-f15'];
+    // steps[0..15] = 16 custom fields
+    const fieldIcons = ['ic-f1','ic-f2','ic-f3','ic-f4','ic-f5','ic-f6','ic-f7','ic-f8','ic-f9','ic-f10','ic-f11','ic-f12','ic-f13','ic-f14','ic-f15','ic-f16'];
     const fallback = result.success ? 'ok' : 'err';
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 16; i++) {
       if (i > 0) markIcon(fieldIcons[i], 'spin');
       await new Promise(r => setTimeout(r, 180));
       const s = result.steps[i];
       markIcon(fieldIcons[i], s ? (s.ok ? 'ok' : 'err') : fallback);
     }
-    // steps[15] = sidebar menu link (non-critical — shown as warning, never blocks)
+    // steps[16] = sidebar menu link (non-critical — shown as warning, never blocks)
     markIcon('ic-menu', 'spin');
     await new Promise(r => setTimeout(r, 350));
-    const menuStep = result.steps[15];
+    const menuStep = result.steps[16];
     markIcon('ic-menu', menuStep ? (menuStep.ok ? 'ok' : 'warn') : fallback);
-    // steps[16] = config save
+    // steps[17] = config save
     markIcon('ic-save', 'spin');
     await new Promise(r => setTimeout(r, 300));
     markIcon('ic-save', result.success ? 'ok' : 'err');
 
     document.getElementById('openAppBtn').onclick = () => {
-      window.location.href = `/?location_id=${effectiveLocationId}`;
+      window.location.href = `/?location_id=${effectiveLocationId}&_cb=${_cb()}`;
     };
 
     if (result.success) {
-      const menuStep = result.steps[15];
+      const menuStep = result.steps[16];
       if (menuStep && !menuStep.ok) {
         // Show menu warning text briefly before advancing so the user can read it
         const errEl = document.getElementById('setupError');
