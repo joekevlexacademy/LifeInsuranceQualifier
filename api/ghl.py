@@ -177,16 +177,46 @@ async def list_custom_fields(access_token: str, location_id: str) -> list:
         return r.json().get("customFields", [])
 
 
+async def list_custom_field_folders(access_token: str, location_id: str) -> list:
+    async with httpx.AsyncClient() as client:
+        r = await client.get(
+            f"{GHL_BASE}/locations/{location_id}/customFields/folders",
+            headers=_headers(access_token),
+        )
+        _check(r, "list custom field folders")
+        data = r.json()
+        return data.get("folders") or data.get("customFieldFolders") or []
+
+
+async def create_custom_field_folder(
+    access_token: str, location_id: str, name: str
+) -> str:
+    """Create a custom field folder and return its ID."""
+    async with httpx.AsyncClient() as client:
+        r = await client.post(
+            f"{GHL_BASE}/locations/{location_id}/customFields/folders",
+            headers=_headers(access_token),
+            json={"name": name, "model": "contact"},
+        )
+        _check(r, "create custom field folder")
+        data = r.json()
+        folder = data.get("folder") or data.get("customFieldFolder") or data
+        return folder.get("id") or folder.get("_id") or ""
+
+
 async def create_custom_field(
     access_token: str,
     location_id: str,
     name: str,
     data_type: str,
     options: Optional[list] = None,
+    group_id: Optional[str] = None,
 ) -> dict:
     payload: dict = {"name": name, "dataType": data_type, "model": "contact"}
     if options:
         payload["options"] = options
+    if group_id:
+        payload["groupId"] = group_id
     async with httpx.AsyncClient() as client:
         r = await client.post(
             f"{GHL_BASE}/locations/{location_id}/customFields",
