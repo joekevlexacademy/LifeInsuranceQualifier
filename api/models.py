@@ -22,7 +22,7 @@ class QualificationSubmission(BaseModel):
     coverage_amount: Optional[str] = None
     budget: Optional[str] = None
     urgency: Optional[str] = None
-    goal: Optional[str] = None
+    goal: Optional[str] = None  # primary reason for coverage → LIQ Coverage Reason
 
     # Underwriting triage
     pending_tests: Optional[str] = None
@@ -45,7 +45,54 @@ class QualificationSubmission(BaseModel):
     prior_outcome: Optional[str] = None
     underwriting_notes: Optional[str] = None
 
+    # Dependency: Pending work-up
+    pending_reason: Optional[str] = None
+    pending_date: Optional[str] = None
+    pending_doctor: Optional[str] = None
+    pending_followup: Optional[str] = None
+    pending_notes: Optional[str] = None
+
+    # Dependency: Sleep apnea
+    apnea_type: Optional[str] = None
+    apnea_severity: Optional[str] = None
+    ahi: Optional[str] = None
+    cpap_use: Optional[str] = None
+    nights_per_week: Optional[str] = None
+    hours_per_night: Optional[str] = None
+    daytime_fatigue: Optional[str] = None
+    oxygen_night: Optional[str] = None
+    apnea_conditions: Optional[str] = None  # comma-separated
+
+    # Dependency: Diabetes
+    diabetes_type: Optional[str] = None
+    diagnosis_age: Optional[str] = None
+    a1c: Optional[str] = None
+    insulin_use: Optional[str] = None
+    diabetes_control: Optional[str] = None
+    diabetes_complications: Optional[str] = None  # comma-separated
+
+    # Dependency: Mental health
+    mh_diagnosis: Optional[str] = None
+    mh_stability: Optional[str] = None
+    therapy: Optional[str] = None
+    mh_hospital: Optional[str] = None
+    mh_notes: Optional[str] = None
+
+    # Dependency: Respiratory
+    resp_diagnosis: Optional[str] = None
+    rescue_use: Optional[str] = None
+    oral_steroids: Optional[str] = None
+    smoker_status: Optional[str] = None
+    resp_hospital: Optional[str] = None
+
+    # Dependency: DUI / driving
+    dui_count: Optional[str] = None
+    dui_date: Optional[str] = None
+    license_status: Optional[str] = None
+    substance_program: Optional[str] = None
+    bac: Optional[str] = None
+
     # Computed client-side before submission
-    triage_state: Optional[str] = None       # clean | follow_up | elevated
+    triage_state: Optional[str] = None        # clean | follow_up | elevated
     active_dependencies: Optional[str] = None  # comma-separated labels
     product_direction: Optional[str] = None

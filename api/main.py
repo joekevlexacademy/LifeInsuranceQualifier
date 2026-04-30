@@ -319,18 +319,19 @@ async def get_contact(location_id: str = Query(...), contact_id: str = Query(...
     liq: dict = {}
     if cfg:
         _liq_keys = {
-            cfg.get("field_coverage_amount_id"): "coverage_amount",
-            cfg.get("field_product_type_id"):    "product_type",
-            cfg.get("field_budget_id"):           "budget",
-            cfg.get("field_urgency_id"):          "urgency",
-            cfg.get("field_occupation_id"):       "occupation",
-            cfg.get("field_height_id"):           "height",
-            cfg.get("field_weight_id"):           "weight",
-            cfg.get("field_medications_id"):      "med_list",
-            cfg.get("field_existing_coverage_id"): "existing_coverage",
-            cfg.get("field_prior_outcome_id"):    "prior_outcome",
+            cfg.get("field_coverage_amount_id"):    "coverage_amount",
+            cfg.get("field_product_type_id"):       "product_type",
+            cfg.get("field_budget_id"):             "budget",
+            cfg.get("field_urgency_id"):            "urgency",
+            cfg.get("field_coverage_reason_id"):    "coverage_reason",
+            cfg.get("field_applicant_id"):          "applicant",
+            cfg.get("field_triage_flags_id"):       "triage_flags",
+            cfg.get("field_medications_id"):        "med_list",
+            cfg.get("field_existing_coverage_id"):  "existing_coverage",
+            cfg.get("field_prior_outcome_id"):      "prior_outcome",
             cfg.get("field_underwriting_notes_id"): "underwriting_notes",
-            cfg.get("field_qual_summary_id"):     "qual_summary",
+            cfg.get("field_dependency_details_id"): "dependency_details",
+            cfg.get("field_qual_summary_id"):       "qual_summary",
         }
         _liq_keys.pop(None, None)  # remove any unconfigured fields
         for cf in (contact.get("customFields") or []):
@@ -448,24 +449,25 @@ async def submit_qualification(payload: QualificationSubmission):
     # Explicit fields: only sent when the form field has a value (guard below).
     # Computed fields: only sent when triage was engaged this session.
     field_map: dict = {
-        "field_coverage_amount_id": payload.coverage_amount,
-        "field_product_type_id":    payload.product_type,
-        "field_budget_id":          payload.budget,
-        "field_urgency_id":         payload.urgency,
-        "field_occupation_id":      payload.occupation,
-        "field_height_id":          payload.height,
-        "field_weight_id":          payload.weight,
-        "field_medications_id":     payload.med_list,
+        "field_coverage_amount_id":    payload.coverage_amount,
+        "field_product_type_id":       payload.product_type,
+        "field_budget_id":             payload.budget,
+        "field_urgency_id":            payload.urgency,
+        "field_coverage_reason_id":    payload.goal,
+        "field_applicant_id":          _build_applicant(payload),
+        "field_triage_flags_id":       _build_triage_flags(payload),
+        "field_medications_id":        payload.med_list,
         "field_existing_coverage_id":  payload.existing_coverage,
         "field_prior_outcome_id":      payload.prior_outcome,
         "field_underwriting_notes_id": payload.underwriting_notes,
+        "field_dependency_details_id": _build_dependency_details(payload),
     }
     if triage_engaged:
         field_map.update({
-            "field_triage_state_id":    triage_label,
+            "field_triage_state_id":      triage_label,
             "field_product_direction_id": payload.product_direction,
-            "field_active_deps_id":     payload.active_dependencies,
-            "field_qual_summary_id":    _build_summary(payload, triage_label),
+            "field_active_deps_id":       payload.active_dependencies,
+            "field_qual_summary_id":      _build_summary(payload, triage_label),
         })
     custom_fields = [
         {"id": cfg[cfg_key], "value": value}
@@ -510,7 +512,112 @@ async def submit_qualification(payload: QualificationSubmission):
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+def _build_applicant(p: QualificationSubmission) -> str:
+    """Pipe-delimited key:value string for the LIQ Applicant field."""
+    parts = []
+    if p.age:       parts.append(f"age:{p.age}")
+    if p.sex_at_birth: parts.append(f"sex:{p.sex_at_birth}")
+    if p.occupation: parts.append(f"occupation:{p.occupation}")
+    if p.height:    parts.append(f"height:{p.height}")
+    if p.weight:    parts.append(f"weight:{p.weight}")
+    return " | ".join(parts) if parts else ""
+
+
+def _build_triage_flags(p: QualificationSubmission) -> str:
+    """Pipe-delimited key:value string for the LIQ Triage Flags field."""
+    def yn(v) -> str:
+        if isinstance(v, bool): return "yes" if v else "no"
+        return "yes" if v == "yes" else "no"
+    parts = [
+        f"pending_tests:{yn(p.pending_tests)}",
+        f"hospital_recent:{yn(p.hospital_recent)}",
+        f"prior_rating:{yn(p.underwriting_history)}",
+        f"dui:{yn(p.dui_history)}",
+        f"sleep_apnea:{yn(p.sleep_apnea)}",
+        f"cpap:{yn(p.cpap)}",
+        f"diabetes_meds:{yn(p.diabetes_meds)}",
+        f"psych_meds:{yn(p.psych_meds)}",
+        f"inhaler:{yn(p.inhaler)}",
+        f"cardiac:{yn(p.cardiac_history)}",
+        f"med_change:{yn(p.med_change)}",
+    ]
+    return " | ".join(parts)
+
+
+def _build_dependency_details(p: QualificationSubmission) -> str:
+    """Section-keyed multi-line block for the LIQ Dependency Details field."""
+    sections = []
+
+    if p.pending_tests == "yes":
+        block = ["[pending]"]
+        if p.pending_reason:  block.append(f"reason={p.pending_reason}")
+        if p.pending_date:    block.append(f"date={p.pending_date}")
+        if p.pending_doctor:  block.append(f"doctor={p.pending_doctor}")
+        if p.pending_followup: block.append(f"followup={p.pending_followup}")
+        if p.pending_notes:   block.append(f"notes={p.pending_notes}")
+        if len(block) > 1:
+            sections.append("\n".join(block))
+
+    if p.sleep_apnea or p.cpap:
+        block = ["[sleep]"]
+        if p.apnea_type:       block.append(f"type={p.apnea_type}")
+        if p.apnea_severity:   block.append(f"severity={p.apnea_severity}")
+        if p.ahi:              block.append(f"ahi={p.ahi}")
+        if p.cpap_use:         block.append(f"pap={p.cpap_use}")
+        if p.nights_per_week:  block.append(f"nights={p.nights_per_week}")
+        if p.hours_per_night:  block.append(f"hours={p.hours_per_night}")
+        if p.daytime_fatigue:  block.append(f"fatigue={p.daytime_fatigue}")
+        if p.oxygen_night:     block.append(f"o2={p.oxygen_night}")
+        if p.apnea_conditions: block.append(f"conditions={p.apnea_conditions}")
+        if len(block) > 1:
+            sections.append("\n".join(block))
+
+    if p.diabetes_meds:
+        block = ["[diabetes]"]
+        if p.diabetes_type:          block.append(f"type={p.diabetes_type}")
+        if p.diagnosis_age:          block.append(f"dx_age={p.diagnosis_age}")
+        if p.a1c:                    block.append(f"a1c={p.a1c}")
+        if p.insulin_use:            block.append(f"insulin={p.insulin_use}")
+        if p.diabetes_control:       block.append(f"control={p.diabetes_control}")
+        if p.diabetes_complications: block.append(f"complications={p.diabetes_complications}")
+        if len(block) > 1:
+            sections.append("\n".join(block))
+
+    if p.psych_meds:
+        block = ["[mental]"]
+        if p.mh_diagnosis:  block.append(f"diagnosis={p.mh_diagnosis}")
+        if p.mh_stability:  block.append(f"stability={p.mh_stability}")
+        if p.therapy:       block.append(f"therapy={p.therapy}")
+        if p.mh_hospital:   block.append(f"hospital={p.mh_hospital}")
+        if p.mh_notes:      block.append(f"notes={p.mh_notes}")
+        if len(block) > 1:
+            sections.append("\n".join(block))
+
+    if p.inhaler:
+        block = ["[resp]"]
+        if p.resp_diagnosis: block.append(f"diagnosis={p.resp_diagnosis}")
+        if p.rescue_use:     block.append(f"rescue={p.rescue_use}")
+        if p.oral_steroids:  block.append(f"steroids={p.oral_steroids}")
+        if p.smoker_status:  block.append(f"smoking={p.smoker_status}")
+        if p.resp_hospital:  block.append(f"er={p.resp_hospital}")
+        if len(block) > 1:
+            sections.append("\n".join(block))
+
+    if p.dui_history == "yes":
+        block = ["[dui]"]
+        if p.dui_count:         block.append(f"count={p.dui_count}")
+        if p.dui_date:          block.append(f"date={p.dui_date}")
+        if p.license_status:    block.append(f"license={p.license_status}")
+        if p.substance_program: block.append(f"program={p.substance_program}")
+        if p.bac:               block.append(f"bac={p.bac}")
+        if len(block) > 1:
+            sections.append("\n".join(block))
+
+    return "\n\n".join(sections)
+
+
 def _build_summary(p: QualificationSubmission, triage_label: str) -> str:
+    """Compact summary written to LIQ Qualification Summary custom field."""
     deps = p.active_dependencies or "None"
     lines = [
         f"Triage: {triage_label}",
@@ -524,6 +631,8 @@ def _build_summary(p: QualificationSubmission, triage_label: str) -> str:
         f"  Budget: {p.budget or '—'}",
         f"  Urgency: {p.urgency or '—'}",
     ]
+    if p.goal:
+        lines.append(f"  Reason: {p.goal}")
     notes = []
     if p.pending_tests == "yes":
         notes.append("Pending tests / open work-up — hold on quoting")
@@ -542,6 +651,7 @@ def _build_summary(p: QualificationSubmission, triage_label: str) -> str:
 
 
 def _build_note(p: QualificationSubmission) -> str:
+    """Full structured note written to GHL contact Notes (Live Advisor Summary)."""
     deps = p.active_dependencies or "None"
     state_label = (p.triage_state or "N/A").replace("_", " ").title()
     lines = [
@@ -555,15 +665,102 @@ def _build_note(p: QualificationSubmission) -> str:
         f"  Amount   : {p.coverage_amount or '—'}",
         f"  Budget   : {p.budget or '—'}",
         f"  Urgency  : {p.urgency or '—'}",
-        f"  Goal     : {p.goal or '—'}",
+        f"  Reason   : {p.goal or '—'}",
         "",
         "▸ Applicant",
         f"  Age / Sex / State : {p.age or '—'} / {p.sex_at_birth or '—'} / {p.state or '—'}",
         f"  Occupation        : {p.occupation or '—'}",
         f"  Height / Weight   : {p.height or '—'} / {p.weight or '—'}",
         "",
+        "▸ Triage Flags",
+        f"  Pending tests     : {p.pending_tests or '—'}",
+        f"  Recent hospital   : {p.hospital_recent or '—'}",
+        f"  Prior rating      : {p.underwriting_history or '—'}",
+        f"  DUI history       : {p.dui_history or '—'}",
+        f"  Sleep apnea/CPAP  : {'yes' if p.sleep_apnea or p.cpap else 'no'}",
+        f"  Diabetes meds     : {'yes' if p.diabetes_meds else 'no'}",
+        f"  Psych meds        : {'yes' if p.psych_meds else 'no'}",
+        f"  Inhaler           : {'yes' if p.inhaler else 'no'}",
+        f"  Cardiac history   : {'yes' if p.cardiac_history else 'no'}",
+        f"  Med change        : {p.med_change or '—'}",
+        "",
         "▸ Medications",
         f"  {p.med_list or '—'}",
+    ]
+
+    # Dependency details blocks (only active ones)
+    if p.pending_tests == "yes" and any([p.pending_reason, p.pending_date, p.pending_doctor]):
+        lines += [
+            "",
+            "▸ Pending Work-up",
+            f"  Reason   : {p.pending_reason or '—'}",
+            f"  Date     : {p.pending_date or '—'}",
+            f"  Doctor   : {p.pending_doctor or '—'}",
+            f"  Follow-up: {p.pending_followup or '—'}",
+        ]
+        if p.pending_notes:
+            lines.append(f"  Notes    : {p.pending_notes}")
+
+    if p.sleep_apnea or p.cpap:
+        lines += [
+            "",
+            "▸ Sleep Apnea",
+            f"  Type / Severity : {p.apnea_type or '—'} / {p.apnea_severity or '—'}",
+            f"  AHI             : {p.ahi or '—'}",
+            f"  PAP therapy     : {p.cpap_use or '—'} ({p.nights_per_week or '—'} nights, {p.hours_per_night or '—'} hrs)",
+            f"  Daytime fatigue : {p.daytime_fatigue or '—'}",
+            f"  Night oxygen    : {p.oxygen_night or '—'}",
+        ]
+        if p.apnea_conditions:
+            lines.append(f"  Conditions      : {p.apnea_conditions}")
+
+    if p.diabetes_meds:
+        lines += [
+            "",
+            "▸ Diabetes",
+            f"  Type / Dx age : {p.diabetes_type or '—'} / {p.diagnosis_age or '—'}",
+            f"  A1C           : {p.a1c or '—'}",
+            f"  Insulin       : {p.insulin_use or '—'}",
+            f"  Control       : {p.diabetes_control or '—'}",
+        ]
+        if p.diabetes_complications:
+            lines.append(f"  Complications : {p.diabetes_complications}")
+
+    if p.psych_meds:
+        lines += [
+            "",
+            "▸ Mental Health",
+            f"  Diagnosis  : {p.mh_diagnosis or '—'}",
+            f"  Stability  : {p.mh_stability or '—'}",
+            f"  Therapy    : {p.therapy or '—'}",
+            f"  Hospital   : {p.mh_hospital or '—'}",
+        ]
+        if p.mh_notes:
+            lines.append(f"  Notes      : {p.mh_notes}")
+
+    if p.inhaler:
+        lines += [
+            "",
+            "▸ Respiratory",
+            f"  Diagnosis  : {p.resp_diagnosis or '—'}",
+            f"  Rescue use : {p.rescue_use or '—'}",
+            f"  Steroids   : {p.oral_steroids or '—'}",
+            f"  Smoking    : {p.smoker_status or '—'}",
+            f"  ER / hosp  : {p.resp_hospital or '—'}",
+        ]
+
+    if p.dui_history == "yes":
+        lines += [
+            "",
+            "▸ Driving / DUI",
+            f"  Count   : {p.dui_count or '—'}",
+            f"  Date    : {p.dui_date or '—'}",
+            f"  License : {p.license_status or '—'}",
+            f"  Program : {p.substance_program or '—'}",
+            f"  BAC     : {p.bac or '—'}",
+        ]
+
+    lines += [
         "",
         "▸ Underwriting",
         f"  Existing Coverage : {p.existing_coverage or '—'}",

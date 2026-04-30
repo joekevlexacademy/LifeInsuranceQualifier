@@ -290,11 +290,11 @@
             <div class="field half"><label for="oxygenNight">Night oxygen use?</label><select id="oxygenNight"><option value="">Select…</option><option>No</option><option>Yes</option></select></div>
             <div class="field"><label>Associated conditions</label>
               <div class="check-grid">
-                <label class="check"><input type="checkbox" /> Hypertension</label>
-                <label class="check"><input type="checkbox" /> Diabetes</label>
-                <label class="check"><input type="checkbox" /> Atrial fibrillation</label>
-                <label class="check"><input type="checkbox" /> Pulmonary hypertension</label>
-                <label class="check"><input type="checkbox" /> Obesity concern</label>
+                <label class="check"><input type="checkbox" id="apneaCondHypertension" /> Hypertension</label>
+                <label class="check"><input type="checkbox" id="apneaCondDiabetes" /> Diabetes</label>
+                <label class="check"><input type="checkbox" id="apneaCondAfib" /> Atrial fibrillation</label>
+                <label class="check"><input type="checkbox" id="apneaCondPulmonary" /> Pulmonary hypertension</label>
+                <label class="check"><input type="checkbox" id="apneaCondObesity" /> Obesity concern</label>
               </div>
             </div>
           </div>
@@ -311,11 +311,11 @@
             <div class="field half"><label for="diabetesControl">Control status</label><select id="diabetesControl"><option value="">Select…</option><option>Stable / controlled</option><option>Some fluctuation</option><option>Poor control</option></select></div>
             <div class="field"><label>Complications</label>
               <div class="check-grid">
-                <label class="check"><input type="checkbox" /> Neuropathy</label>
-                <label class="check"><input type="checkbox" /> Retinopathy</label>
-                <label class="check"><input type="checkbox" /> Kidney involvement</label>
-                <label class="check"><input type="checkbox" /> Foot ulcer history</label>
-                <label class="check"><input type="checkbox" /> No complications known</label>
+                <label class="check"><input type="checkbox" id="diabCompNeuropathy" /> Neuropathy</label>
+                <label class="check"><input type="checkbox" id="diabCompRetinopathy" /> Retinopathy</label>
+                <label class="check"><input type="checkbox" id="diabCompKidney" /> Kidney involvement</label>
+                <label class="check"><input type="checkbox" id="diabCompFootUlcer" /> Foot ulcer history</label>
+                <label class="check"><input type="checkbox" id="diabCompNone" /> No complications known</label>
               </div>
             </div>
           </div>
@@ -499,17 +499,131 @@
         // Pre-fill previously saved LIQ qualification fields
         const liq = c.liq || {};
         const _set = (id, val) => { if (val) { const el = document.getElementById(id); if (el) el.value = val; } };
+        const _check = (id, val) => { if (val) { const el = document.getElementById(id); if (el) el.checked = true; } };
+
+        // Simple scalar fields
         _set('coverageAmount',    liq.coverage_amount);
         _set('productType',       liq.product_type);
         _set('budget',            liq.budget);
         _set('urgency',           liq.urgency);
-        _set('occupation',        liq.occupation);
-        _set('height',            liq.height);
-        _set('weight',            liq.weight);
-        _set('medList',           liq.med_list);
         _set('existingCoverage',  liq.existing_coverage);
         _set('priorOutcome',      liq.prior_outcome);
         _set('underwritingNotes', liq.underwriting_notes);
+        _set('medList',           liq.med_list);
+
+        // LIQ Coverage Reason → goal textarea
+        _set('goal', liq.coverage_reason);
+
+        // LIQ Applicant: "age:44 | sex:Male | occupation:Ops | height:5'11" | weight:220 lbs"
+        if (liq.applicant) {
+          const kv = {};
+          liq.applicant.split('|').forEach(p => {
+            const [k, ...rest] = p.trim().split(':');
+            if (k) kv[k.trim()] = rest.join(':').trim();
+          });
+          _set('age', kv.age);
+          _set('sexAtBirth', kv.sex);
+          _set('occupation', kv.occupation);
+          _set('height', kv.height);
+          _set('weight', kv.weight);
+        }
+
+        // LIQ Triage Flags: "pending_tests:yes | hospital_recent:no | ..."
+        if (liq.triage_flags) {
+          const kv = {};
+          liq.triage_flags.split('|').forEach(p => {
+            const [k, ...rest] = p.trim().split(':');
+            if (k) kv[k.trim()] = rest.join(':').trim();
+          });
+          _set('pendingTests',        kv.pending_tests === 'yes' ? 'yes' : kv.pending_tests === 'no' ? 'no' : '');
+          _set('hospitalRecent',      kv.hospital_recent === 'yes' ? 'yes' : kv.hospital_recent === 'no' ? 'no' : '');
+          _set('underwritingHistory', kv.prior_rating === 'yes' ? 'yes' : kv.prior_rating === 'no' ? 'no' : '');
+          _set('duiHistory',          kv.dui === 'yes' ? 'yes' : kv.dui === 'no' ? 'no' : '');
+          _set('medChange',           kv.med_change === 'yes' ? 'yes' : kv.med_change === 'no' ? 'no' : '');
+          if (kv.sleep_apnea === 'yes') document.getElementById('sleepApnea').checked = true;
+          if (kv.cpap === 'yes') document.getElementById('cpap').checked = true;
+          if (kv.diabetes_meds === 'yes') document.getElementById('diabetesMeds').checked = true;
+          if (kv.psych_meds === 'yes') document.getElementById('psychMeds').checked = true;
+          if (kv.inhaler === 'yes') document.getElementById('inhaler').checked = true;
+          if (kv.cardiac === 'yes') document.getElementById('cardiacHistory').checked = true;
+        }
+
+        // LIQ Dependency Details: section-keyed format "[section]\nkey=value\n..."
+        if (liq.dependency_details) {
+          const sections = {};
+          let cur = null;
+          liq.dependency_details.split('\n').forEach(line => {
+            const sec = line.match(/^\[(\w+)\]$/);
+            if (sec) { cur = sec[1]; sections[cur] = {}; }
+            else if (cur && line.includes('=')) {
+              const eq = line.indexOf('=');
+              sections[cur][line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+            }
+          });
+
+          const s = sections;
+          if (s.pending) {
+            _set('pendingReason',   s.pending.reason);
+            _set('pendingDate',     s.pending.date);
+            _set('pendingDoctor',   s.pending.doctor);
+            _set('pendingFollowup', s.pending.followup);
+            _set('pendingNotes',    s.pending.notes);
+          }
+          if (s.sleep) {
+            _set('apneaType',      s.sleep.type);
+            _set('apneaSeverity',  s.sleep.severity);
+            _set('ahi',            s.sleep.ahi);
+            _set('cpapUse',        s.sleep.pap);
+            _set('nightsPerWeek',  s.sleep.nights);
+            _set('hoursPerNight',  s.sleep.hours);
+            _set('daytimeFatigue', s.sleep.fatigue);
+            _set('oxygenNight',    s.sleep.o2);
+            if (s.sleep.conditions) {
+              const conds = s.sleep.conditions.toLowerCase();
+              if (conds.includes('hypertension'))         document.getElementById('apneaCondHypertension').checked = true;
+              if (conds.includes('diabetes'))             document.getElementById('apneaCondDiabetes').checked = true;
+              if (conds.includes('atrial'))               document.getElementById('apneaCondAfib').checked = true;
+              if (conds.includes('pulmonary'))            document.getElementById('apneaCondPulmonary').checked = true;
+              if (conds.includes('obesity'))              document.getElementById('apneaCondObesity').checked = true;
+            }
+          }
+          if (s.diabetes) {
+            _set('diabetesType',    s.diabetes.type);
+            _set('diagnosisAge',    s.diabetes.dx_age);
+            _set('a1c',             s.diabetes.a1c);
+            _set('insulinUse',      s.diabetes.insulin);
+            _set('diabetesControl', s.diabetes.control);
+            if (s.diabetes.complications) {
+              const comps = s.diabetes.complications.toLowerCase();
+              if (comps.includes('neuropathy'))   document.getElementById('diabCompNeuropathy').checked = true;
+              if (comps.includes('retinopathy'))  document.getElementById('diabCompRetinopathy').checked = true;
+              if (comps.includes('kidney'))       document.getElementById('diabCompKidney').checked = true;
+              if (comps.includes('foot ulcer'))   document.getElementById('diabCompFootUlcer').checked = true;
+              if (comps.includes('no compl'))     document.getElementById('diabCompNone').checked = true;
+            }
+          }
+          if (s.mental) {
+            _set('mhDiagnosis', s.mental.diagnosis);
+            _set('mhStability', s.mental.stability);
+            _set('therapy',     s.mental.therapy);
+            _set('mhHospital',  s.mental.hospital);
+            _set('mhNotes',     s.mental.notes);
+          }
+          if (s.resp) {
+            _set('respDiagnosis', s.resp.diagnosis);
+            _set('rescueUse',     s.resp.rescue);
+            _set('oralSteroids',  s.resp.steroids);
+            _set('smokerStatus',  s.resp.smoking);
+            _set('respHospital',  s.resp.er);
+          }
+          if (s.dui) {
+            _set('duiCount',         s.dui.count);
+            _set('duiDate',          s.dui.date);
+            _set('licenseStatus',    s.dui.license);
+            _set('substanceProgram', s.dui.program);
+            _set('bac',              s.dui.bac);
+          }
+        }
 
         updateSelectColors();
         renderState();
@@ -691,6 +805,66 @@
       existing_coverage: document.getElementById('existingCoverage').value || null,
       prior_outcome: document.getElementById('priorOutcome').value || null,
       underwriting_notes: document.getElementById('underwritingNotes').value.trim() || null,
+
+      // Dependency: Pending work-up
+      pending_reason:   document.getElementById('pendingReason')?.value.trim() || null,
+      pending_date:     document.getElementById('pendingDate')?.value.trim() || null,
+      pending_doctor:   document.getElementById('pendingDoctor')?.value.trim() || null,
+      pending_followup: document.getElementById('pendingFollowup')?.value.trim() || null,
+      pending_notes:    document.getElementById('pendingNotes')?.value.trim() || null,
+
+      // Dependency: Sleep apnea
+      apnea_type:      document.getElementById('apneaType')?.value || null,
+      apnea_severity:  document.getElementById('apneaSeverity')?.value || null,
+      ahi:             document.getElementById('ahi')?.value.trim() || null,
+      cpap_use:        document.getElementById('cpapUse')?.value || null,
+      nights_per_week: document.getElementById('nightsPerWeek')?.value.trim() || null,
+      hours_per_night: document.getElementById('hoursPerNight')?.value.trim() || null,
+      daytime_fatigue: document.getElementById('daytimeFatigue')?.value || null,
+      oxygen_night:    document.getElementById('oxygenNight')?.value || null,
+      apnea_conditions: [
+        document.getElementById('apneaCondHypertension')?.checked ? 'Hypertension' : null,
+        document.getElementById('apneaCondDiabetes')?.checked ? 'Diabetes' : null,
+        document.getElementById('apneaCondAfib')?.checked ? 'Atrial fibrillation' : null,
+        document.getElementById('apneaCondPulmonary')?.checked ? 'Pulmonary hypertension' : null,
+        document.getElementById('apneaCondObesity')?.checked ? 'Obesity concern' : null,
+      ].filter(Boolean).join(', ') || null,
+
+      // Dependency: Diabetes
+      diabetes_type:           document.getElementById('diabetesType')?.value || null,
+      diagnosis_age:           document.getElementById('diagnosisAge')?.value.trim() || null,
+      a1c:                     document.getElementById('a1c')?.value.trim() || null,
+      insulin_use:             document.getElementById('insulinUse')?.value || null,
+      diabetes_control:        document.getElementById('diabetesControl')?.value || null,
+      diabetes_complications:  [
+        document.getElementById('diabCompNeuropathy')?.checked ? 'Neuropathy' : null,
+        document.getElementById('diabCompRetinopathy')?.checked ? 'Retinopathy' : null,
+        document.getElementById('diabCompKidney')?.checked ? 'Kidney involvement' : null,
+        document.getElementById('diabCompFootUlcer')?.checked ? 'Foot ulcer history' : null,
+        document.getElementById('diabCompNone')?.checked ? 'No complications known' : null,
+      ].filter(Boolean).join(', ') || null,
+
+      // Dependency: Mental health
+      mh_diagnosis: document.getElementById('mhDiagnosis')?.value || null,
+      mh_stability: document.getElementById('mhStability')?.value || null,
+      therapy:      document.getElementById('therapy')?.value || null,
+      mh_hospital:  document.getElementById('mhHospital')?.value || null,
+      mh_notes:     document.getElementById('mhNotes')?.value.trim() || null,
+
+      // Dependency: Respiratory
+      resp_diagnosis: document.getElementById('respDiagnosis')?.value || null,
+      rescue_use:     document.getElementById('rescueUse')?.value || null,
+      oral_steroids:  document.getElementById('oralSteroids')?.value || null,
+      smoker_status:  document.getElementById('smokerStatus')?.value || null,
+      resp_hospital:  document.getElementById('respHospital')?.value || null,
+
+      // Dependency: DUI
+      dui_count:         document.getElementById('duiCount')?.value.trim() || null,
+      dui_date:          document.getElementById('duiDate')?.value.trim() || null,
+      license_status:    document.getElementById('licenseStatus')?.value || null,
+      substance_program: document.getElementById('substanceProgram')?.value || null,
+      bac:               document.getElementById('bac')?.value.trim() || null,
+
       triage_state: state,
       active_dependencies: deps,
       product_direction: dir,
