@@ -385,17 +385,21 @@ async def clear_qualifications(location_id: str = Query(...)):
 
 
 @app.get("/api/qualifications/recent")
-async def recent_qualifications(location_id: str = Query(...)):
+async def recent_qualifications(
+    location_id: str = Query(...),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=50),
+):
     result = (
         _sb()
         .table("qualifications")
         .select("*")
         .eq("location_id", location_id)
         .order("qualified_at", desc=True)
-        .limit(100)
+        .limit(500)
         .execute()
     )
-    # Return only the most recent qualification per contact, preserving date order
+    # Deduplicate: keep only the most recent qualification per contact
     seen: set = set()
     unique: list = []
     for row in (result.data or []):
@@ -403,9 +407,19 @@ async def recent_qualifications(location_id: str = Query(...)):
         if cid not in seen:
             seen.add(cid)
             unique.append(row)
-        if len(unique) >= 10:
-            break
-    return {"qualifications": unique}
+
+    total = len(unique)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = min(page, total_pages)
+    offset = (page - 1) * per_page
+
+    return {
+        "qualifications": unique[offset : offset + per_page],
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "total_pages": total_pages,
+    }
 
 
 @app.post("/api/submit")

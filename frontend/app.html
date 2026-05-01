@@ -132,6 +132,19 @@
       background: rgba(255,255,255,0.05); color: #9fb0d9; margin-top: 8px;
     }
     .btn-cancel:hover { background: rgba(255,255,255,0.08); }
+    .pagination {
+      display: flex; align-items: center; justify-content: center;
+      gap: 12px; margin-top: 16px;
+    }
+    .page-btn {
+      background: rgba(19,26,46,0.88); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 9px; padding: 8px 18px; color: #9fb0d9;
+      font: inherit; font-size: 0.84rem; font-weight: 600; cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .page-btn:hover:not(:disabled) { border-color: rgba(122,162,255,0.4); color: #eef2ff; }
+    .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .page-info { color: #9fb0d9; font-size: 0.84rem; min-width: 90px; text-align: center; }
   </style>
 </head>
 <body>
@@ -163,6 +176,11 @@
   </div>
   <div class="recent-list" id="recentList">
     <div class="empty">Loading…</div>
+  </div>
+  <div class="pagination" id="pagination" style="display:none;">
+    <button class="page-btn" id="prevBtn" onclick="changePage(-1)">← Prev</button>
+    <span class="page-info" id="pageInfo"></span>
+    <button class="page-btn" id="nextBtn" onclick="changePage(1)">Next →</button>
   </div>
 </div>
 
@@ -360,11 +378,67 @@
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       closeClearModal();
-      document.getElementById('recentList').innerHTML =
-        '<div class="empty">No qualifications yet. Start with a contact above.</div>';
+      loadRecent(1);
     } catch (e) {
       document.getElementById('clearConfirmBtn').disabled = false;
       alert('Failed to clear list: ' + e.message);
+    }
+  }
+
+  let _currentPage = 1;
+  let _totalPages  = 1;
+
+  function changePage(delta) {
+    const next = _currentPage + delta;
+    if (next < 1 || next > _totalPages) return;
+    loadRecent(next);
+  }
+
+  async function loadRecent(page = 1) {
+    try {
+      const res = await fetch(
+        `/api/qualifications/recent?location_id=${locationId}&page=${page}`
+      );
+      const data = await res.json();
+      const { qualifications, page: pg, total_pages } = data;
+
+      _currentPage = pg;
+      _totalPages  = total_pages;
+
+      const list = document.getElementById('recentList');
+      if (!qualifications.length) {
+        list.innerHTML = '<div class="empty">No qualifications yet. Start with a contact above.</div>';
+        document.getElementById('pagination').style.display = 'none';
+        return;
+      }
+
+      list.innerHTML = qualifications.map(q => {
+        const state = q.triage_state || 'unknown';
+        const label = state.replace('_', ' ');
+        const date  = new Date(q.qualified_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return `
+          <a class="recent-item" href="/qualify?location_id=${locationId}&contact_id=${q.contact_id}&_cb=${_cb()}">
+            <div class="triage-dot ${state}"></div>
+            <div class="recent-info">
+              <strong>${q.contact_name || 'Unknown'}</strong>
+              <span>Last qualified ${date}</span>
+            </div>
+            <span class="triage-badge ${state}">${label}</span>
+          </a>`;
+      }).join('');
+
+      const pag = document.getElementById('pagination');
+      if (total_pages > 1) {
+        pag.style.display = 'flex';
+        document.getElementById('prevBtn').disabled = (pg <= 1);
+        document.getElementById('nextBtn').disabled = (pg >= total_pages);
+        document.getElementById('pageInfo').textContent = `Page ${pg} of ${total_pages}`;
+      } else {
+        pag.style.display = 'none';
+      }
+    } catch {
+      document.getElementById('recentList').innerHTML =
+        '<div class="empty">Could not load recent qualifications.</div>';
     }
   }
 
@@ -373,39 +447,10 @@
 
     fetch(`/api/location?location_id=${locationId}`)
       .then(r => r.json())
-      .then(d => {
-        document.getElementById('locationName').textContent = d.name || 'Your sub-account';
-      })
-      .catch(() => {
-        document.getElementById('locationName').textContent = 'Your sub-account';
-      });
+      .then(d => { document.getElementById('locationName').textContent = d.name || 'Your sub-account'; })
+      .catch(() => { document.getElementById('locationName').textContent = 'Your sub-account'; });
 
-    fetch(`/api/qualifications/recent?location_id=${locationId}`)
-      .then(r => r.json())
-      .then(({ qualifications }) => {
-        const list = document.getElementById('recentList');
-        if (!qualifications.length) {
-          list.innerHTML = '<div class="empty">No qualifications yet. Start with a contact above.</div>';
-          return;
-        }
-        list.innerHTML = qualifications.map(q => {
-          const state = q.triage_state || 'unknown';
-          const label = state.replace('_', ' ');
-          const date = new Date(q.qualified_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-          return `
-            <a class="recent-item" href="/qualify?location_id=${locationId}&contact_id=${q.contact_id}&_cb=${_cb()}">
-              <div class="triage-dot ${state}"></div>
-              <div class="recent-info">
-                <strong>${q.contact_name || 'Unknown'}</strong>
-                <span>Last qualified ${date}</span>
-              </div>
-              <span class="triage-badge ${state}">${label}</span>
-            </a>`;
-        }).join('');
-      })
-      .catch(() => {
-        document.getElementById('recentList').innerHTML = '<div class="empty">Could not load recent qualifications.</div>';
-      });
+    loadRecent(1);
   }
 </script>
 </body>
