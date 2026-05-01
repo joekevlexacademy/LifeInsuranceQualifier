@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Life Insurance Qualifier</title>
   <style>
     :root {
@@ -422,6 +425,8 @@
 </div>
 
 <script>
+  function _cb() { return Math.floor(Math.random() * 900000) + 100000; }
+
   const urlParams = new URLSearchParams(location.search);
   const locationId = urlParams.get('location_id') || '';
   const contactId  = urlParams.get('contact_id') || '';
@@ -455,7 +460,7 @@
   }
 
   // Back button
-  document.getElementById('backBtn').href = `/?location_id=${locationId}`;
+  document.getElementById('backBtn').href = `/?location_id=${locationId}&_cb=${_cb()}`;
 
   // Show new contact section if needed
   if (isNew) {
@@ -901,7 +906,7 @@
   }
 
   function qualifyAnother() {
-    window.location.href = `/?location_id=${locationId}`;
+    window.location.href = `/?location_id=${locationId}&_cb=${_cb()}`;
   }
 
   renderState();

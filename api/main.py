@@ -392,10 +392,20 @@ async def recent_qualifications(location_id: str = Query(...)):
         .select("*")
         .eq("location_id", location_id)
         .order("qualified_at", desc=True)
-        .limit(10)
+        .limit(100)
         .execute()
     )
-    return {"qualifications": result.data or []}
+    # Return only the most recent qualification per contact, preserving date order
+    seen: set = set()
+    unique: list = []
+    for row in (result.data or []):
+        cid = row.get("contact_id")
+        if cid not in seen:
+            seen.add(cid)
+            unique.append(row)
+        if len(unique) >= 10:
+            break
+    return {"qualifications": unique}
 
 
 @app.post("/api/submit")

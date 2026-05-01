@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Life Insurance Qualifier</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
@@ -207,6 +210,8 @@
 </div>
 
 <script>
+  function _cb() { return Math.floor(Math.random() * 900000) + 100000; }
+
   const params = new URLSearchParams(location.search);
   const locationId = params.get('location_id') || '';
 
@@ -223,7 +228,7 @@
     function resolveLocation(lid) {
       if (resolved) return;
       resolved = true;
-      window.location.replace('/?location_id=' + encodeURIComponent(lid));
+      window.location.replace(`/?location_id=${encodeURIComponent(lid)}&_cb=${_cb()}`);
     }
 
     // Try GHL postMessage first (fast path for published apps)
@@ -255,7 +260,7 @@
         document.getElementById('recentList').innerHTML =
           '<div class="empty" style="margin-bottom:8px">Choose the sub-account you want to open:</div>' +
           locations.map(l => `
-            <a class="recent-item" href="/?location_id=${encodeURIComponent(l.id)}">
+            <a class="recent-item" href="/?location_id=${encodeURIComponent(l.id)}&_cb=${_cb()}">
               <div class="recent-info">
                 <strong>${l.name}</strong>
                 <span style="font-size:0.78rem;opacity:0.6">${l.id}</span>
@@ -320,7 +325,7 @@
   }
 
   function selectContact(contactId) {
-    window.location.href = `/qualify?location_id=${locationId}&contact_id=${contactId}`;
+    window.location.href = `/qualify?location_id=${locationId}&contact_id=${contactId}&_cb=${_cb()}`;
   }
 
   document.getElementById('searchModal').addEventListener('click', e => {
@@ -364,7 +369,7 @@
   }
 
   function initApp() {
-    document.getElementById('newContactBtn').href = `/qualify?location_id=${locationId}`;
+    document.getElementById('newContactBtn').href = `/qualify?location_id=${locationId}&_cb=${_cb()}`;
 
     fetch(`/api/location?location_id=${locationId}`)
       .then(r => r.json())
@@ -388,7 +393,7 @@
           const label = state.replace('_', ' ');
           const date = new Date(q.qualified_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
           return `
-            <a class="recent-item" href="/qualify?location_id=${locationId}&contact_id=${q.contact_id}">
+            <a class="recent-item" href="/qualify?location_id=${locationId}&contact_id=${q.contact_id}&_cb=${_cb()}">
               <div class="triage-dot ${state}"></div>
               <div class="recent-info">
                 <strong>${q.contact_name || 'Unknown'}</strong>
