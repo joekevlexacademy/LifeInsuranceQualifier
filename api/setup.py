@@ -8,7 +8,6 @@ from supabase import create_client
 from . import ghl
 
 FIELDS = [
-    # ── SINGLE_OPTIONS (GHL-filterable / workflow-triggerable) ──────────────────
     {
         "name": "LIQ Triage State",
         "data_type": "SINGLE_OPTIONS",
@@ -16,10 +15,35 @@ FIELDS = [
         "config_key": "field_triage_state_id",
     },
     {
+        "name": "LIQ Product Direction",
+        "data_type": "TEXT",
+        "config_key": "field_product_direction_id",
+    },
+    {
+        "name": "LIQ Applicant",
+        "data_type": "TEXT",
+        "config_key": "field_applicant_id",
+    },
+    {
         "name": "LIQ Product Type",
         "data_type": "SINGLE_OPTIONS",
         "options": ["Term life", "Whole life", "Universal life", "Final expense", "Mortgage protection", "Not sure yet"],
         "config_key": "field_product_type_id",
+    },
+    {
+        "name": "LIQ Coverage Amount",
+        "data_type": "TEXT",
+        "config_key": "field_coverage_amount_id",
+    },
+    {
+        "name": "LIQ Budget",
+        "data_type": "TEXT",
+        "config_key": "field_budget_id",
+    },
+    {
+        "name": "LIQ Coverage Reason",
+        "data_type": "TEXT",
+        "config_key": "field_coverage_reason_id",
     },
     {
         "name": "LIQ Urgency",
@@ -39,57 +63,30 @@ FIELDS = [
         "options": ["No recent application", "Approved as applied", "Rated", "Postponed", "Declined"],
         "config_key": "field_prior_outcome_id",
     },
-    # ── TEXT (plain scalars) ────────────────────────────────────────────────────
-    {
-        "name": "LIQ Coverage Amount",
-        "data_type": "TEXT",
-        "config_key": "field_coverage_amount_id",
-    },
-    {
-        "name": "LIQ Budget",
-        "data_type": "TEXT",
-        "config_key": "field_budget_id",
-    },
-    {
-        "name": "LIQ Coverage Reason",
-        "data_type": "TEXT",
-        "config_key": "field_coverage_reason_id",
-    },
-    {
-        "name": "LIQ Applicant",
-        "data_type": "TEXT",
-        "config_key": "field_applicant_id",
-    },
     {
         "name": "LIQ Triage Flags",
         "data_type": "TEXT",
         "config_key": "field_triage_flags_id",
     },
     {
-        "name": "LIQ Product Direction",
-        "data_type": "TEXT",
-        "config_key": "field_product_direction_id",
+        "name": "LIQ Medications",
+        "data_type": "LARGE_TEXT",
+        "config_key": "field_medications_id",
     },
     {
         "name": "LIQ Active Dependencies",
         "data_type": "TEXT",
         "config_key": "field_active_deps_id",
     },
-    # ── LARGE_TEXT (multi-line / grouped blocks) ────────────────────────────────
     {
-        "name": "LIQ Medications",
+        "name": "LIQ Dependency Details",
         "data_type": "LARGE_TEXT",
-        "config_key": "field_medications_id",
+        "config_key": "field_dependency_details_id",
     },
     {
         "name": "LIQ Underwriting Notes",
         "data_type": "LARGE_TEXT",
         "config_key": "field_underwriting_notes_id",
-    },
-    {
-        "name": "LIQ Dependency Details",
-        "data_type": "LARGE_TEXT",
-        "config_key": "field_dependency_details_id",
     },
     {
         "name": "LIQ Qualification Summary",
