@@ -221,7 +221,7 @@
       <h2>You're all set!</h2>
       <p class="sub">Life Insurance Qualifier is ready. Open any contact in GHL and click <strong>Start Qualification</strong> to begin.</p>
       <button class="btn btn-primary" id="openAppBtn">Open App →</button>
-      <button class="btn btn-ghost" onclick="window.close()">Close this tab</button>
+      <button class="btn btn-ghost" id="closeBtn" onclick="closeTab()">Close this tab</button>
     </div>
   </div>
 </div>
@@ -231,6 +231,15 @@
   const step = params.get('step');
   let locationId = params.get('location_id');
   const companyId = params.get('company_id');
+
+  function closeTab() {
+    window.close();
+    // Browsers block window.close() on manually-opened tabs; fall back to a hint.
+    setTimeout(() => {
+      const btn = document.getElementById('closeBtn');
+      if (btn) btn.textContent = 'You may now close this tab';
+    }, 300);
+  }
 
   function show(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
