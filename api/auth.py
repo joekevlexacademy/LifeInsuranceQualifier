@@ -3,12 +3,11 @@ from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 
 import httpx
-from supabase import create_client
+import psycopg2.extras
+
+from .db import get_conn
 
 GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token"
-# Supports standard GHL domain and white-label custom domains.
-# Set GHL_OAUTH_DOMAIN in Railway env vars if using a custom domain (e.g. app.hatch.insure).
-# Defaults to marketplace.gohighlevel.com if not set.
 _GHL_OAUTH_DOMAIN = os.environ.get("GHL_OAUTH_DOMAIN", "marketplace.gohighlevel.com")
 GHL_OAUTH_BASE = f"https://{_GHL_OAUTH_DOMAIN}/v2/oauth/chooselocation"
 
@@ -17,10 +16,6 @@ GHL_SCOPES = " ".join([
     "custom-menu-link.readonly",
     "custom-menu-link.write",
 ])
-
-
-def _sb():
-    return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
 
 
 def get_oauth_url() -> str:
@@ -50,15 +45,14 @@ async def exchange_code(code: str) -> dict:
 
 
 async def _refresh(location_id: str) -> str:
-    sb = _sb()
-    row = (
-        sb.table("installations")
-        .select("refresh_token")
-        .eq("location_id", location_id)
-        .single()
-        .execute()
-    )
-    refresh_token = row.data["refresh_token"]
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT refresh_token FROM installations WHERE location_id = %s",
+                (location_id,),
+            )
+            row = cur.fetchone()
+    refresh_token = row["refresh_token"]
 
     async with httpx.AsyncClient() as client:
         r = await client.post(
@@ -74,49 +68,51 @@ async def _refresh(location_id: str) -> str:
         data = r.json()
 
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=data["expires_in"])
-    sb.table("installations").update(
-        {
-            "access_token": data["access_token"],
-            "refresh_token": data.get("refresh_token", refresh_token),
-            "expires_at": expires_at.isoformat(),
-        }
-    ).eq("location_id", location_id).execute()
-
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE installations SET access_token=%s, refresh_token=%s, expires_at=%s WHERE location_id=%s",
+                (data["access_token"], data.get("refresh_token", refresh_token), expires_at, location_id),
+            )
     return data["access_token"]
 
 
 async def save_api_key_installation(company_id: str, location_id: str, api_key: str) -> None:
-    """Store a GHL Private Integration key as the location's access credential."""
-    sb = _sb()
-    far_future = (datetime.now(timezone.utc) + timedelta(days=36500)).isoformat()
-    sb.table("installations").upsert({
-        "location_id": location_id,
-        "agency_id": company_id,
-        "access_token": api_key,
-        "refresh_token": "",
-        "expires_at": far_future,
-        "uninstalled_at": None,
-    }).execute()
+    far_future = datetime.now(timezone.utc) + timedelta(days=36500)
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO installations (location_id, agency_id, access_token, refresh_token, expires_at, uninstalled_at)
+                VALUES (%s, %s, %s, '', %s, NULL)
+                ON CONFLICT (location_id) DO UPDATE SET
+                    agency_id      = EXCLUDED.agency_id,
+                    access_token   = EXCLUDED.access_token,
+                    refresh_token  = '',
+                    expires_at     = EXCLUDED.expires_at,
+                    uninstalled_at = NULL
+                """,
+                (location_id, company_id, api_key, far_future),
+            )
 
 
 async def get_agency_key(company_id: str) -> str | None:
-    """Return a valid agency-level token — only the company-level row (location_id = company_id).
-    Refreshes OAuth tokens automatically if expired. Never falls back to subaccount rows."""
     if not company_id:
         return None
-    sb = _sb()
-    rows = sb.table("installations").select(
-        "access_token, expires_at, refresh_token"
-    ).eq("location_id", company_id).execute()
-    if not rows.data:
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT access_token, expires_at, refresh_token FROM installations WHERE location_id = %s",
+                (company_id,),
+            )
+            record = cur.fetchone()
+
+    if not record:
         return None
-    record = rows.data[0]
-    # PIK — never expires, return directly
-    if not record.get("refresh_token"):
-        return record.get("access_token") or None
-    # OAuth token — check expiry and refresh if needed
+    if not record["refresh_token"]:
+        return record["access_token"] or None
     try:
-        expires_at = datetime.fromisoformat(record["expires_at"])
+        expires_at = datetime.fromisoformat(str(record["expires_at"]))
         if expires_at > datetime.now(timezone.utc) + timedelta(minutes=5):
             return record["access_token"]
         return await _refresh(company_id)
@@ -125,48 +121,39 @@ async def get_agency_key(company_id: str) -> str | None:
 
 
 async def save_agency_key(company_id: str, api_key: str) -> None:
-    """Store an agency-level PIK for menu operations.
-    Always overwrites — a freshly entered PIK takes precedence over any stale or
-    expired OAuth token that may be sitting in the company row.
-    """
     if not company_id:
         return
-    sb = _sb()
-    far_future = (datetime.now(timezone.utc) + timedelta(days=36500)).isoformat()
-    # Remove orphaned null-location rows left by pre-fix installs that ran
-    # save_agency_key(None, ...) before company_id resolution was added.
-    try:
-        sb.table("installations").delete().is_("location_id", "null").execute()
-    except Exception:
-        pass
-    sb.table("installations").upsert({
-        "location_id": company_id,
-        "agency_id": company_id,
-        "access_token": api_key,
-        "refresh_token": "",
-        "expires_at": far_future,
-        "uninstalled_at": None,
-    }).execute()
+    far_future = datetime.now(timezone.utc) + timedelta(days=36500)
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM installations WHERE location_id IS NULL")
+            cur.execute(
+                """
+                INSERT INTO installations (location_id, agency_id, access_token, refresh_token, expires_at, uninstalled_at)
+                VALUES (%s, %s, %s, '', %s, NULL)
+                ON CONFLICT (location_id) DO UPDATE SET
+                    agency_id      = EXCLUDED.agency_id,
+                    access_token   = EXCLUDED.access_token,
+                    refresh_token  = '',
+                    expires_at     = EXCLUDED.expires_at,
+                    uninstalled_at = NULL
+                """,
+                (company_id, company_id, api_key, far_future),
+            )
 
 
 async def get_any_menu_token() -> str | None:
-    """Return any valid OAuth token with custom-menu-link.write scope.
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT access_token, expires_at, location_id, refresh_token FROM installations WHERE refresh_token != '' LIMIT 5"
+            )
+            rows = cur.fetchall()
 
-    PIKs lack this scope, so for menu operations during PIK-only setups we find
-    the first OAuth installation (has a refresh_token) stored in Supabase.
-    """
-    sb = _sb()
-    rows = (
-        sb.table("installations")
-        .select("access_token, expires_at, location_id, refresh_token")
-        .neq("refresh_token", "")
-        .limit(5)
-        .execute()
-    )
     now = datetime.now(timezone.utc) + timedelta(minutes=5)
-    for row in rows.data or []:
+    for row in rows:
         try:
-            if datetime.fromisoformat(row["expires_at"]) > now:
+            if datetime.fromisoformat(str(row["expires_at"])) > now:
                 return row["access_token"]
             return await _refresh(row["location_id"])
         except Exception:
@@ -175,51 +162,39 @@ async def get_any_menu_token() -> str | None:
 
 
 async def get_agency_id(location_id: str) -> str | None:
-    """Look up the company/agency id stored alongside a location's installation row."""
-    sb = _sb()
-    rows = (
-        sb.table("installations")
-        .select("agency_id")
-        .eq("location_id", location_id)
-        .execute()
-    )
-    if rows.data and rows.data[0].get("agency_id"):
-        return rows.data[0]["agency_id"]
-    return None
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT agency_id FROM installations WHERE location_id = %s",
+                (location_id,),
+            )
+            row = cur.fetchone()
+    return row["agency_id"] if row and row.get("agency_id") else None
 
 
 async def get_valid_token(location_id: str) -> str:
-    sb = _sb()
-
-    def _first(rows) -> dict | None:
-        return rows.data[0] if rows.data else None
-
-    # Try direct location match first
-    record = _first(
-        sb.table("installations")
-        .select("access_token, expires_at, location_id, refresh_token")
-        .eq("location_id", location_id)
-        .execute()
-    )
-
-    # Fall back to company-level install
-    if not record:
-        record = _first(
-            sb.table("installations")
-            .select("access_token, expires_at, location_id, refresh_token")
-            .eq("agency_id", location_id)
-            .execute()
-        )
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT access_token, expires_at, location_id, refresh_token FROM installations WHERE location_id = %s",
+                (location_id,),
+            )
+            record = cur.fetchone()
+            if not record:
+                cur.execute(
+                    "SELECT access_token, expires_at, location_id, refresh_token FROM installations WHERE agency_id = %s LIMIT 1",
+                    (location_id,),
+                )
+                record = cur.fetchone()
 
     if not record:
         raise ValueError(f"No installation found for location_id: {location_id}")
 
-    # Private Integration keys have no refresh_token — they don't expire
-    if not record.get("refresh_token"):
+    if not record["refresh_token"]:
         return record["access_token"]
 
     resolved_id = record["location_id"]
-    expires_at = datetime.fromisoformat(record["expires_at"])
+    expires_at = datetime.fromisoformat(str(record["expires_at"]))
     if expires_at <= datetime.now(timezone.utc) + timedelta(minutes=5):
         return await _refresh(resolved_id)
 
@@ -227,43 +202,55 @@ async def get_valid_token(location_id: str) -> str:
 
 
 async def ensure_location_installation(company_id: str, location_id: str) -> None:
-    """Create a location row from the company token only if one does not already exist.
-    Never overwrites an existing row so stored PIKs are never clobbered."""
-    sb = _sb()
-    # If a row already exists for this location (e.g. a PIK was saved), leave it alone.
-    existing = sb.table("installations").select("location_id").eq("location_id", location_id).execute()
-    if existing.data:
-        return
-    rows = sb.table("installations").select("*").eq("location_id", company_id).execute()
-    if not rows.data:
-        raise ValueError(f"No company installation found for: {company_id}")
-    src = rows.data[0]
-    sb.table("installations").insert({
-        "location_id": location_id,
-        "agency_id": company_id,
-        "access_token": src["access_token"],
-        "refresh_token": src["refresh_token"],
-        "expires_at": src["expires_at"],
-        "uninstalled_at": None,
-    }).execute()
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT location_id FROM installations WHERE location_id = %s",
+                (location_id,),
+            )
+            if cur.fetchone():
+                return
+            cur.execute(
+                "SELECT * FROM installations WHERE location_id = %s",
+                (company_id,),
+            )
+            src = cur.fetchone()
+            if not src:
+                raise ValueError(f"No company installation found for: {company_id}")
+            cur.execute(
+                """
+                INSERT INTO installations (location_id, agency_id, access_token, refresh_token, expires_at, uninstalled_at)
+                VALUES (%s, %s, %s, %s, %s, NULL)
+                """,
+                (location_id, company_id, src["access_token"], src["refresh_token"], src["expires_at"]),
+            )
 
 
 async def save_installation(token_data: dict) -> str:
-    sb = _sb()
     location_id = token_data.get("locationId") or token_data.get("companyId")
     if not location_id:
         raise ValueError(f"No locationId or companyId in token response: {list(token_data.keys())}")
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data["expires_in"])
 
-    sb.table("installations").upsert(
-        {
-            "location_id": location_id,
-            "agency_id": token_data.get("companyId", ""),
-            "access_token": token_data["access_token"],
-            "refresh_token": token_data["refresh_token"],
-            "expires_at": expires_at.isoformat(),
-            "uninstalled_at": None,
-        }
-    ).execute()
-
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO installations (location_id, agency_id, access_token, refresh_token, expires_at, uninstalled_at)
+                VALUES (%s, %s, %s, %s, %s, NULL)
+                ON CONFLICT (location_id) DO UPDATE SET
+                    agency_id      = EXCLUDED.agency_id,
+                    access_token   = EXCLUDED.access_token,
+                    refresh_token  = EXCLUDED.refresh_token,
+                    expires_at     = EXCLUDED.expires_at,
+                    uninstalled_at = NULL
+                """,
+                (
+                    location_id,
+                    token_data.get("companyId", ""),
+                    token_data["access_token"],
+                    token_data["refresh_token"],
+                    expires_at,
+                ),
+            )
     return location_id

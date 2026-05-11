@@ -3,14 +3,15 @@ import random
 from datetime import datetime, timezone
 from pathlib import Path
 
+import psycopg2.extras
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
-from supabase import create_client
 
 from . import auth, ghl
 from . import setup as app_setup
 from . import config as app_config
+from .db import get_conn
 from .models import QualificationSubmission
 
 load_dotenv()
@@ -22,10 +23,6 @@ FRONTEND = Path(__file__).parent.parent / "frontend"
 
 def _html(name: str) -> HTMLResponse:
     return HTMLResponse((FRONTEND / name).read_text(encoding="utf-8"))
-
-
-def _sb():
-    return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
 
 
 # ── Pages ──────────────────────────────────────────────────────────────────────
@@ -151,7 +148,12 @@ async def store_agency_key_and_run(
             real_cid = loc_data.get("companyId") or loc_data.get("parentId")
             if real_cid and real_cid != location_id:
                 company_id = real_cid
-                _sb().table("installations").update({"agency_id": real_cid}).eq("location_id", location_id).execute()
+                with get_conn() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "UPDATE installations SET agency_id = %s WHERE location_id = %s",
+                            (real_cid, location_id),
+                        )
         except Exception:
             pass
 
@@ -203,7 +205,12 @@ async def run_setup(location_id: str = Query(...), company_id: str = Query(None)
             real_cid = loc_data.get("companyId") or loc_data.get("parentId")
             if real_cid and real_cid != location_id:
                 company_id = real_cid
-                _sb().table("installations").update({"agency_id": real_cid}).eq("location_id", location_id).execute()
+                with get_conn() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "UPDATE installations SET agency_id = %s WHERE location_id = %s",
+                            (real_cid, location_id),
+                        )
         except Exception:
             pass
 
@@ -282,15 +289,12 @@ async def run_setup_with_key(
 @app.get("/api/configured-locations")
 async def configured_locations():
     """Return all sub-accounts that have completed setup, with names from GHL."""
-    sb = _sb()
-    rows = (
-        sb.table("location_config")
-        .select("location_id")
-        .eq("setup_complete", True)
-        .execute()
-    )
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT location_id FROM location_config WHERE setup_complete = TRUE")
+            rows = cur.fetchall()
     locations = []
-    for row in rows.data or []:
+    for row in rows:
         lid = row["location_id"]
         try:
             token = await auth.get_valid_token(lid)
@@ -380,7 +384,9 @@ async def search_contacts(location_id: str = Query(...), q: str = Query(...)):
 
 @app.delete("/api/qualifications")
 async def clear_qualifications(location_id: str = Query(...)):
-    _sb().table("qualifications").delete().eq("location_id", location_id).execute()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM qualifications WHERE location_id = %s", (location_id,))
     return {"ok": True}
 
 
@@ -390,19 +396,16 @@ async def recent_qualifications(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=50),
 ):
-    result = (
-        _sb()
-        .table("qualifications")
-        .select("*")
-        .eq("location_id", location_id)
-        .order("qualified_at", desc=True)
-        .limit(500)
-        .execute()
-    )
-    # Deduplicate: keep only the most recent qualification per contact
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT * FROM qualifications WHERE location_id = %s ORDER BY qualified_at DESC LIMIT 500",
+                (location_id,),
+            )
+            rows = cur.fetchall()
     seen: set = set()
     unique: list = []
-    for row in (result.data or []):
+    for row in rows:
         cid = row.get("contact_id")
         if cid not in seen:
             seen.add(cid)
@@ -518,17 +521,14 @@ async def submit_qualification(payload: QualificationSubmission):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to create GHL note: {exc}")
 
-    # Record in Supabase for the recent-qualifications list
+    # Record in DB for the recent-qualifications list
     try:
-        _sb().table("qualifications").insert(
-            {
-                "location_id": payload.location_id,
-                "contact_id": contact_id,
-                "contact_name": payload.full_name or "Unknown",
-                "triage_state": payload.triage_state,
-                "qualified_at": datetime.now(timezone.utc).isoformat(),
-            }
-        ).execute()
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO qualifications (location_id, contact_id, contact_name, triage_state, qualified_at) VALUES (%s, %s, %s, %s, %s)",
+                    (payload.location_id, contact_id, payload.full_name or "Unknown", payload.triage_state, datetime.now(timezone.utc)),
+                )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to save qualification record: {exc}")
 

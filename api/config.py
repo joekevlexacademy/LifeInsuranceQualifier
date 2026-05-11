@@ -1,21 +1,17 @@
-import os
-from supabase import create_client
+import psycopg2.extras
 
-
-def _sb():
-    return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
+from .db import get_conn
 
 
 def get_config(location_id: str) -> dict | None:
-    result = (
-        _sb()
-        .table("location_config")
-        .select("*")
-        .eq("location_id", location_id)
-        .single()
-        .execute()
-    )
-    return result.data
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT * FROM location_config WHERE location_id = %s",
+                (location_id,),
+            )
+            row = cur.fetchone()
+    return dict(row) if row else None
 
 
 def is_setup_complete(location_id: str) -> bool:

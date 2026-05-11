@@ -3,8 +3,9 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from supabase import create_client
+import psycopg2.extras
 
+from .db import get_conn
 from . import ghl
 
 FIELDS = [
@@ -104,11 +105,9 @@ async def run(
     company_id: Optional[str] = None,
     agency_token: Optional[str] = None,
 ) -> dict:
-    sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
     steps = []
     config: dict = {"location_id": location_id}
 
-    # Check which fields already exist so re-running setup is safe
     try:
         existing = await ghl.list_custom_fields(access_token, location_id)
         existing_by_name = {f["name"]: f for f in existing}
@@ -136,16 +135,11 @@ async def run(
                 steps.append({"label": f"{label} field created", "ok": True})
         except Exception as exc:
             steps.append({"label": f"{label} field failed: {exc}", "ok": False})
-        # Brief pause between field creation calls to avoid GHL rate limiting
         await asyncio.sleep(0.4)
 
-    # steps[0..14] = the 15 fields. Compute all_ok before adding further steps.
     all_ok = all(s["ok"] for s in steps)
 
-    # steps[15] — sidebar menu link (non-blocking: failure won't prevent config save)
-    # Subaccount PIKs are rejected by GHL's agency-scoped custom-menu endpoints
-    # ("Invalid Private Integration token"), so only attempt when we have a
-    # dedicated agency-level token.
+    # Sidebar menu link (non-blocking)
     menu_cid = company_id or location_id
     menu_url: str = ""
     if not agency_token:
@@ -162,11 +156,8 @@ async def run(
             base = os.environ["APP_BASE_URL"].rstrip("/")
             if not base.startswith("http"):
                 base = "https://" + base
-            # No location_id in the URL — the client detects the active sub-account
-            # via a picker or GHL postMessage when the app loads.
             menu_url = base + "/?location_id={{location.id}}"
 
-            # Match by title only.
             existing = next(
                 (m for m in existing_menus
                  if (m.get("title") or m.get("name")) == MENU_NAME),
@@ -174,8 +165,6 @@ async def run(
             )
             if existing:
                 menu_id = existing.get("id") or existing.get("_id")
-                # GHL may return locations as strings OR as objects {"id": "...", ...}.
-                # Normalise to a plain list of ID strings so membership checks work.
                 raw_locs = existing.get("locations") or []
                 existing_locs = [
                     (loc["id"] if isinstance(loc, dict) else loc)
@@ -189,7 +178,6 @@ async def run(
                     (loc["id"] if isinstance(loc, dict) else loc)
                     for loc in (existing.get("locations") or [])
                 ]
-                # "clean" means the URL already uses the GHL template variable
                 url_clean = "location_id={{location.id}}" in existing_url
                 if is_iframe and url_clean and already_listed:
                     steps.append({"label": "Sidebar menu link found", "ok": True})
@@ -214,24 +202,35 @@ async def run(
         except Exception as exc:
             err_str = str(exc)
             label = f"Sidebar menu link failed: {exc} [url={menu_url!r}]"
-            # If the stored agency key is revoked, clear it from Supabase so the
-            # next setup run detects no key and prompts the user to enter a new one.
             if company_id and "Invalid Private Integration" in err_str:
                 try:
-                    sb.table("installations").update({
-                        "access_token": "",
-                        "refresh_token": "",
-                    }).eq("location_id", company_id).execute()
+                    with get_conn() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                "UPDATE installations SET access_token='', refresh_token='' WHERE location_id = %s",
+                                (company_id,),
+                            )
                 except Exception:
                     pass
                 label += " — agency key appears revoked; re-run setup to enter a new one"
             steps.append({"label": label, "ok": False})
 
-    # steps[16] — config save
+    # Save config to DB
     if all_ok:
         config["setup_complete"] = True
         config["setup_at"] = datetime.now(timezone.utc).isoformat()
-        sb.table("location_config").upsert(config).execute()
+        cols = list(config.keys())
+        vals = [config[k] for k in cols]
+        col_names = ", ".join(cols)
+        placeholders = ", ".join(["%s"] * len(cols))
+        update_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != "location_id")
+        sql = (
+            f"INSERT INTO location_config ({col_names}) VALUES ({placeholders}) "
+            f"ON CONFLICT (location_id) DO UPDATE SET {update_clause}"
+        )
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, vals)
         steps.append({"label": "Configuration saved", "ok": True})
     else:
         steps.append({"label": "Configuration not saved — fix errors above", "ok": False})
